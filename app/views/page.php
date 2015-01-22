@@ -2,15 +2,13 @@
 <html lang="en" data-framework="react">
 <head>
     <meta charset="utf-8">
-    <title>React • TodoMVC</title>
+    <title>999 notes</title>
     <link rel="stylesheet" href="<?php echo asset('bower_components/todomvc-common/base.css') ?>">
 </head>
 <body>
 <section id="todoapp"></section>
 <footer id="info">
     <p>Double-click to edit a todo</p>
-    <p>Created by <a href="http://github.com/petehunt/">petehunt</a></p>
-    <p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
 </footer>
 
 <script src="<?php echo asset('bower_components/todomvc-common/base.js') ?>"></script>
