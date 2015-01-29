@@ -13,8 +13,8 @@ class HomeController extends BaseController
 
     public function login()
     {
-        Auth::attempt(array('email' => 'killoff@gmail.com'), true);
-        Redirect::to('/');
+        //Auth::attempt(array('email' => 'killoff@gmail.com'), true);
+        //Redirect::to('/');
     }
 
 

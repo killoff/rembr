@@ -22,31 +22,11 @@
 `render` into an HTML-looking format. Since the two models above are
 unrelated to React, we didn't need those transforms. -->
 <script type="text/jsx" src="<?php echo asset('js/todoItem.jsx') ?>"></script>
+<script type="text/jsx" src="<?php echo asset('js/user.jsx') ?>"></script>
+<script type="text/jsx" src="<?php echo asset('js/tag.jsx') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/footer.jsx') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app.jsx') ?>"></script>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 <script src="<?php echo asset('plugins/jquery.textcomplete.min.js') ?>"></script>
-
-<script type="text/javascript">
-    $(function() {
-        var elements = ['span', 'div', 'h1', 'h2', 'h3'];
-        $('#new-todo').textcomplete([
-            { // html
-                match: /<(\w*)$/,
-                search: function (term, callback) {
-                    console.log('search');
-                    callback($.map(elements, function (element) {
-                        return element.indexOf(term) === 0 ? element : null;
-                    }));
-                },
-                index: 1,
-                replace: function (element) {
-                    return ['<' + element + '>', '</' + element + '>'];
-                }
-            }
-        ]);
-    });
-
-</script>
 </body>
 </html>

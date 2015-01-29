@@ -5,203 +5,268 @@
 /*global React, Router*/
 var app = app || {};
 
+var emojies = ['first', 'second', 'go go notes'];
 
 (function () {
-	'use strict';
-	var Utils = app.Utils;
+    'use strict';
+    var Utils = app.Utils;
 
-	app.ALL_TODOS = 'all';
-	app.ACTIVE_TODOS = 'active';
-	app.COMPLETED_TODOS = 'completed';
-	var TodoFooter = app.TodoFooter;
-	var TodoItem = app.TodoItem;
+    app.ALL_TODOS = 'all';
+    app.ACTIVE_TODOS = 'active';
+    app.COMPLETED_TODOS = 'completed';
+    var TodoFooter = app.TodoFooter;
+    var TodoItem = app.TodoItem;
+    var TodoTag = app.TodoTag;
+    var TodoUser = app.TodoUser;
 
-	var ENTER_KEY = 13;
+    var ENTER_KEY = 13;
 
-	var TodoApp = React.createClass({
-		getInitialState: function () {
-			return {
-				nowShowing: app.ALL_TODOS,
-				editing: null
-			};
-		},
+    var TodoApp = React.createClass({
+        getInitialState: function () {
+            return {
+                nowShowing: app.ALL_TODOS,
+                editing: null
+            };
+        },
 
-		componentDidMount: function () {
-			var setState = this.setState;
-			var router = Router({
-				'/': setState.bind(this, {nowShowing: app.ALL_TODOS}),
-				'/active': setState.bind(this, {nowShowing: app.ACTIVE_TODOS}),
-				'/completed': setState.bind(this, {nowShowing: app.COMPLETED_TODOS})
-			});
-			router.init('/');
-		},
+        componentDidMount: function () {
+            var setState = this.setState;
+            var router = Router({
+                '/': setState.bind(this, {nowShowing: app.ALL_TODOS}),
+                '/active': setState.bind(this, {nowShowing: app.ACTIVE_TODOS}),
+                '/completed': setState.bind(this, {nowShowing: app.COMPLETED_TODOS})
+            });
+            router.init('/');
 
-		handleNewTodoKeyDown: function (event) {
-			if (event.which !== ENTER_KEY) {
-				return;
-			}
+            $('#new-todo').textcomplete([
+                {
+                    match: /\B:([\-+\w]*)$/,
+                    search: function (term, callback) {
+                        callback($.map(emojies, function (emoji) {
 
-			event.preventDefault();
-			var textField = this.refs.newField.getDOMNode();
+                            return emoji.indexOf(term) === 0 ? emoji : null;
+                        }));
+                    },
+                    template: function (value) {
+                        return value;
+                    },
+                    replace: function (value) {
+                        return ':' + value + ': ';
+                    },
+                    index: 1
+                },
+                {
+                    words: ['apple', 'google', 'facebook', 'facesssbook', 'github'],
+                    match: /\b(\w{2,})$/,
+                    search: function (term, callback) {
+                        callback($.map(this.words, function (word) {
+                            return word.indexOf(term) === 0 ? word : null;
+                        }));
+                    },
+                    index: 1,
+                    replace: function (word) {
+                        return word + ' ';
+                    }
+                }
+            ]);
+        },
 
-			if (textField.value.trim()) {
+        handleNewTodoKeyDown: function (event) {
+            if (!event.ctrlKey || event.keyCode !== ENTER_KEY) {
+                return;
+            }
 
-				var todo = {
-					id: Utils.uuid(),
-					text: textField.value.trim(),
-					completed: false
-				}
-				this.props.model.addTodo(todo);
-				textField.value = '';
+            event.preventDefault();
+            var textField = this.refs.newField.getDOMNode();
 
-	            $.ajax({
-	                type: 'post',
-	                url: '/note',
-	                data: JSON.stringify(todo),
-	                success: function (data) {
-	                	console.log('note added');
-	                	console.log(data);
-	                }.bind(this),
-	                error: function(xhr, status, err) {
-	                    console.error(xhr, this.props.addUrl, status, err.toString());
-	                }.bind(this)
-	            });
-			}
-		},
+            if (textField.value.trim()) {
 
-		toggleAll: function (event) {
-			var checked = event.target.checked;
-			this.props.model.toggleAll(checked);
-		},
+                var todo = {
+                    id: Utils.uuid(),
+                    text: textField.value.trim(),
+                    completed: false
+                }
+                this.props.model.addTodo(todo);
+                textField.value = '';
 
-		toggle: function (todoToToggle) {
-			this.props.model.toggle(todoToToggle);
-		},
+                $.ajax({
+                    type: 'post',
+                    url: '/note',
+                    data: JSON.stringify(todo),
+                    success: function (data) {
+                        console.log('note added');
+                        console.log(data);
+                    }.bind(this),
+                    error: function(xhr, status, err) {
+                        console.error(xhr, this.props.addUrl, status, err.toString());
+                    }.bind(this)
+                });
+            }
+        },
 
-		destroy: function (todo) {
-			this.props.model.destroy(todo);
-		},
+        toggleAll: function (event) {
+            var checked = event.target.checked;
+            this.props.model.toggleAll(checked);
+        },
 
-		edit: function (todo, callback) {
-			// refer to todoItem.js `handleEdit` for the reasoning behind the
-			// callback
-			this.setState({editing: todo.id}, function () {
-				callback();
-			});
-		},
+        toggle: function (todoToToggle) {
+            this.props.model.toggle(todoToToggle);
+        },
 
-		save: function (todoToSave, text) {
-			this.props.model.save(todoToSave, text);
-			this.setState({editing: null});
-		},
+        destroy: function (todo) {
+            this.props.model.destroy(todo);
+        },
 
-		cancel: function () {
-			this.setState({editing: null});
-		},
+        edit: function (todo, callback) {
+            // refer to todoItem.js `handleEdit` for the reasoning behind the
+            // callback
+            this.setState({editing: todo.id}, function () {
+                callback();
+            });
+        },
 
-		clearCompleted: function () {
-			this.props.model.clearCompleted();
-		},
+        save: function (todoToSave, text) {
+            this.props.model.save(todoToSave, text);
+            this.setState({editing: null});
+        },
 
-		render: function () {
-			var footer;
-			var main;
-			var todos = this.props.model.todos;
+        cancel: function () {
+            this.setState({editing: null});
+        },
 
-			var shownTodos = todos.filter(function (todo) {
-				switch (this.state.nowShowing) {
-				case app.ACTIVE_TODOS:
-					return !todo.completed;
-				case app.COMPLETED_TODOS:
-					return todo.completed;
-				default:
-					return true;
-				}
-			}, this);
+        clearCompleted: function () {
+            this.props.model.clearCompleted();
+        },
 
-			var todoItems = shownTodos.map(function (todo) {
-				return (
-					<TodoItem
-						key={todo.id}
-						todo={todo}
-						onToggle={this.toggle.bind(this, todo)}
-						onDestroy={this.destroy.bind(this, todo)}
-						onEdit={this.edit.bind(this, todo)}
-						editing={this.state.editing === todo.id}
-						onSave={this.save.bind(this, todo)}
-						onCancel={this.cancel}
-					/>
-				);
-			}, this);
+        render: function () {
+            var footer;
+            var main;
+            var todos = this.props.model.todos;
 
-			var activeTodoCount = todos.reduce(function (accum, todo) {
-				return todo.completed ? accum : accum + 1;
-			}, 0);
+            var shownTodos = todos.filter(function (todo) {
+                switch (this.state.nowShowing) {
+                case app.ACTIVE_TODOS:
+                    return !todo.completed;
+                case app.COMPLETED_TODOS:
+                    return todo.completed;
+                default:
+                    return true;
+                }
+            }, this);
 
-			var completedCount = todos.length - activeTodoCount;
+            var todoItems = shownTodos.map(function (todo) {
+                return (
+                    <TodoItem
+                        key={todo.id}
+                        todo={todo}
+                        onToggle={this.toggle.bind(this, todo)}
+                        onDestroy={this.destroy.bind(this, todo)}
+                        onEdit={this.edit.bind(this, todo)}
+                        editing={this.state.editing === todo.id}
+                        onSave={this.save.bind(this, todo)}
+                        onCancel={this.cancel}
+                    />
+                );
+            }, this);
+console.log('1');
+            var todoTags = this.props.tags.map(function (tag) {
+                return (
+                    <TodoTag
+                        tag={tag}
+                    />
+                );
+            }, this);
+            console.log('2');
 
-			if (activeTodoCount || completedCount) {
-				footer =
-					<TodoFooter
-						count={activeTodoCount}
-						completedCount={completedCount}
-						nowShowing={this.state.nowShowing}
-						onClearCompleted={this.clearCompleted}
-					/>;
-			}
+            var todoUser = <TodoUser
+                        user={this.props.user}
+                    />;
+            console.log('3');
 
-			if (todos.length) {
-				main = (
-					<section id="main">
-						<input
-							id="toggle-all"
-							type="checkbox"
-							onChange={this.toggleAll}
-							checked={activeTodoCount === 0}
-						/>
-						<ul id="todo-list">
-							{todoItems}
-						</ul>
-					</section>
-				);
-			}
+            var activeTodoCount = todos.reduce(function (accum, todo) {
+                return todo.completed ? accum : accum + 1;
+            }, 0);
 
-			return (
-				<div>
-					<header id="header">
-						<h1>todos</h1>
-						<textarea
-							ref="newField"
-							id="new-todo"
-							placeholder="What needs to be done?"
-							onKeyDown={this.handleNewTodoKeyDown}
-							autoFocus={true}
-						/>
-					</header>
-					{main}
-					{footer}
-				</div>
-			);
-		}
-	});
+            var completedCount = todos.length - activeTodoCount;
 
-	var model = new app.TodoModel('react-todos');
-	// model.initialize();
+            if (activeTodoCount || completedCount) {
+                footer =
+                    <TodoFooter
+                        count={activeTodoCount}
+                        completedCount={completedCount}
+                        nowShowing={this.state.nowShowing}
+                        onClearCompleted={this.clearCompleted}
+                    />;
+            }
 
-	function render() {
-		React.render(
-			<TodoApp model={model} />,
-			document.getElementById('todoapp')
-		);
-	}
+            if (todos.length) {
+                main = (
+                    <section id="main">
 
-	model.subscribe('add', render);
-	model.subscribe('save', render);
-	model.subscribe('destroy', render);
+                        <input
+                            id="toggle-all"
+                            type="checkbox"
+                            onChange={this.toggleAll}
+                            checked={activeTodoCount === 0}
+                        />
 
-    $.get('/notes', {}, function (response) {
-    	model.todos = $.parseJSON(response);
-		render();	
+                        <ul id="todo-list">
+                            {todoItems}
+                        </ul>
+                    </section>
+                );
+            }
+
+            return (
+                <div>
+                    <header id="header">
+                        <div id="user">
+                            {todoUser}
+                        </div>
+                        <ul id="todo-tags">
+                            {todoTags}
+                        </ul>
+                        <h1>todos</h1>
+                        <textarea
+                            ref="newField"
+                            id="new-todo"
+                            placeholder="What needs to be done?"
+                            onKeyDown={this.handleNewTodoKeyDown}
+                            autoFocus={true}
+                        />
+                    </header>
+                    {main}
+                    {footer}
+                </div>
+            );
+        }
+    });
+
+    var model = new app.TodoModel('react-todos');
+    // model.initialize();
+
+    var user = {};
+    var tags = {};
+
+    function render(user, tags) {
+        console.log(user);
+        console.log(tags);
+        React.render(
+            <TodoApp model={model} user={user} tags={tags} />,
+            document.getElementById('todoapp')
+        );
+    }
+
+    model.subscribe('add', render);
+    model.subscribe('save', render);
+    model.subscribe('destroy', render);
+
+    $.get('/all', {}, function (response) {
+        var responseJson = $.parseJSON(response);
+        user = responseJson.user;
+        tags = responseJson.tags;
+        model.todos = responseJson.notes;
+        render(user, tags);
     });
 
 })();

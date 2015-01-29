@@ -2,6 +2,30 @@
 class NoteController extends BaseController
 {
     const TAG_ENCLOSURE = ':';
+    const INITIAL_LIMIT = 50;
+
+    public function all()
+    {
+        $userId = Auth::id();
+        $response = array(
+            'notes' => array(),
+            'tags' => array()
+        );
+
+        if (!Auth::check()) {
+            return json_encode($response);
+        }
+
+        $response['notes'] = DB::select('select note_id, text, uuid from note where user_id=? order by updated_at desc limit ?',
+            array($userId, self::INITIAL_LIMIT)
+        );
+        $response['tags'] = DB::select('select tag_id, name from tag where user_id=? order by name', array($userId));
+
+        $response['user'] = Auth::user();
+        $response['get_user'] = Auth::getUser();
+
+        return json_encode($response);
+    }
 
     public function add()
     {
@@ -25,8 +49,15 @@ class NoteController extends BaseController
                     $note->text = str_replace($tagWithEnclosure, '', $note->text);
                 }
             }
+            $now = $date = date('Y-m-d H:i:s', time());
             $noteId = DB::table('note')->insertGetId(
-                array('user_id' => Auth::id(), 'text' => $note->text, 'uuid' => $note->id)
+                array(
+                    'user_id' => Auth::id(),
+                    'text' => $note->text,
+                    'uuid' => $note->id,
+                    'created_at' => $now,
+                    'updated_at' => $now
+                )
             );
 
             $this->saveTags($noteId, $matches[1]);

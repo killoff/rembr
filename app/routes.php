@@ -15,3 +15,4 @@ Route::get('/google-oauth', array('as' => 'googleLogin', 'uses' => 'OauthControl
 Route::get('/facebook-oauth', array('as' => 'facebookLogin', 'uses' => 'OauthController@facebook'));
 Route::post('/note', array('as' => 'notePost', 'uses' => 'NoteController@add'));
 Route::get('/notes', array('as' => 'noteList', 'uses' => 'NoteController@listing'));
+Route::get('/all', array('as' => 'all', 'uses' => 'NoteController@all'));

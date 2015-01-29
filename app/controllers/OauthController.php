@@ -33,7 +33,7 @@ class OauthController extends BaseController
                 return Redirect::to( (string)$service->getAuthorizationUri() );
             }
         } catch (\Exception $e) {
-            return Redirect::route('splash')->with('message', 'Login Failed');
+            return Redirect::route('splash')->with('message', 'Login Failed'.$e->getMessage());
         }
     }
 
