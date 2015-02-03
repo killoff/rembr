@@ -1,0 +1,97 @@
+@charset "UTF-8";
+
+// Mixins
+@import "components/prefixer";
+@import "components/mixins";
+@import "components/color";
+
+// Variables;
+@import "components/variables";
+@import "localvars";
+
+// Reset
+@import "components/normalize";
+
+// components
+@import "components/global";
+@import "components/icons-material-design";
+@import "components/grid";
+@import "components/navbar";
+@import "components/roboto";
+@import "components/typography";
+//@import "components/cards";
+@import "components/toast";
+//@import "components/tabs";
+//@import "components/tooltip";
+@import "components/buttons";
+//@import "components/dropdown";
+@import "components/waves";
+@import "components/modal";
+@import "components/collapsible";
+@import "components/materialbox";
+@import "components/form";
+@import "components/table_of_contents";
+@import "components/sideNav";
+//@import "components/preloader";
+//@import "components/slider";
+//@import "components/date_picker/default.scss";
+//@import "components/date_picker/default.date.scss";
+//@import "components/date_picker/default.time.scss";
+
+.note-tag  {
+  min-width: 1rem;
+  padding: 0 4px;
+  text-align: center;
+  font-weight: 300;
+  font-size: 0.8rem;
+  line-height: inherit;
+  color: #81c784;
+  float: right;
+  border-color: #424242;
+  border: 1px solid #e0e0e0;
+  margin-right: 2px;
+//  background-color: #f1f8e9 ;
+  @include box-sizing(border-box);
+  @include border-radius(7px);
+}
+
+
+/* Sample */
+
+.dropdown-menu {
+  border: 1px solid #ddd;
+  background-color: white;
+}
+
+.dropdown-menu li {
+  border-top: 1px solid #ddd;
+  padding: 2px 5px;
+}
+
+.dropdown-menu li:first-child {
+  border-top: none;
+}
+
+.dropdown-menu li:hover,
+.dropdown-menu .active {
+  background-color: #e8f5e9 ;
+}
+
+
+/* SHOULD not modify */
+
+.dropdown-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dropdown-menu a:hover {
+  cursor: pointer;
+}
+.textcomplete-item {
+  font-size: 0.8rem;
+}
+.textcomplete-item a {
+  color: #26a69a;
+}

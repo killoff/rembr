@@ -3,42 +3,61 @@
 /*jshint trailing:false */
 /*jshint newcap:false */
 /*global React, Router*/
-var app = app || {};
+var NoteApp = NoteApp || {};
 
 var emojies = ['first', 'second', 'go go notes'];
 
 (function () {
     'use strict';
-    var Utils = app.Utils;
-
-    app.ALL_TODOS = 'all';
-    app.ACTIVE_TODOS = 'active';
-    app.COMPLETED_TODOS = 'completed';
-    var TodoFooter = app.TodoFooter;
-    var TodoItem = app.TodoItem;
-    var TodoTag = app.TodoTag;
-    var TodoUser = app.TodoUser;
-
     var ENTER_KEY = 13;
+    var MAIN_INPUT_ID = 'mainInput';
 
-    var TodoApp = React.createClass({
+    var NoteComponent = NoteApp.Note;
+    var TagComponent = NoteApp.Tag;
+    var Utils = NoteApp.Utils;
+
+    var $mainInput;
+
+    var filterTags = [];
+
+    var Main = React.createClass({
         getInitialState: function () {
             return {
-                nowShowing: app.ALL_TODOS,
-                editing: null
+                notes: [],
+                tags: []
             };
         },
 
         componentDidMount: function () {
-            var setState = this.setState;
-            var router = Router({
-                '/': setState.bind(this, {nowShowing: app.ALL_TODOS}),
-                '/active': setState.bind(this, {nowShowing: app.ACTIVE_TODOS}),
-                '/completed': setState.bind(this, {nowShowing: app.COMPLETED_TODOS})
-            });
-            router.init('/');
+            this.syncWithServer();
+            this.initNoteForm();
+        },
 
-            $('#new-todo').textcomplete([
+        syncWithServer: function()
+        {
+            $.ajax({
+                type: 'get',
+                url: this.props.loadAllUrl,
+                success: function (data) {
+                    var responseJson = $.parseJSON(data);
+                    this.setState({
+                        notes: responseJson.notes,
+                        tags: responseJson.tags
+                    });
+                    console.log(this.state);
+
+                }.bind(this),
+                // todo: error handling
+                error: function(xhr, status, err) {
+                    console.error(xhr, this.props.addUrl, status, err.toString());
+                }
+            });
+        },
+
+        initNoteForm: function()
+        {
+            $mainInput = $('#' + MAIN_INPUT_ID);
+            $mainInput.textcomplete([
                 {
                     match: /\B:([\-+\w]*)$/,
                     search: function (term, callback) {
@@ -71,28 +90,46 @@ var emojies = ['first', 'second', 'go go notes'];
             ]);
         },
 
-        handleNewTodoKeyDown: function (event) {
+        updateState: function(key, value)
+        {
+            var state = this.state;
+            state[key] = value;
+            this.setState(state);
+        },
+
+        handleNewNoteKeyDown: function (event) {
             if (!event.ctrlKey || event.keyCode !== ENTER_KEY) {
                 return;
             }
 
             event.preventDefault();
-            var textField = this.refs.newField.getDOMNode();
-
-            if (textField.value.trim()) {
-
-                var todo = {
-                    id: Utils.uuid(),
-                    text: textField.value.trim(),
-                    completed: false
+            var noteText = $mainInput.val().trim();
+            if (noteText) {
+                var tags = noteText.match(/\:([^\:\n\r\s]{1}[^\:\n\r]*)\:/gi) || [];
+                if (tags.length > 0) {
+                    tags = tags.map(function(tag) {
+                        return {
+                            'uuid': Utils.uuid(),
+                            'name': tag.replace(/:/g, '')
+                        };
+                    });
                 }
-                this.props.model.addTodo(todo);
-                textField.value = '';
+
+                var note = {
+                    uuid: Utils.uuid(),
+                    text: noteText,
+                    tags: tags
+                }
+                var _stateNotes = this.state.notes;
+                _stateNotes.unshift(note);
+                this.updateState('notes', _stateNotes);
+//                this.props.model.addNote(todo);
+                $mainInput.val('');
 
                 $.ajax({
                     type: 'post',
                     url: '/note',
-                    data: JSON.stringify(todo),
+                    data: JSON.stringify(note),
                     success: function (data) {
                         console.log('note added');
                         console.log(data);
@@ -102,19 +139,6 @@ var emojies = ['first', 'second', 'go go notes'];
                     }.bind(this)
                 });
             }
-        },
-
-        toggleAll: function (event) {
-            var checked = event.target.checked;
-            this.props.model.toggleAll(checked);
-        },
-
-        toggle: function (todoToToggle) {
-            this.props.model.toggle(todoToToggle);
-        },
-
-        destroy: function (todo) {
-            this.props.model.destroy(todo);
         },
 
         edit: function (todo, callback) {
@@ -138,135 +162,126 @@ var emojies = ['first', 'second', 'go go notes'];
             this.props.model.clearCompleted();
         },
 
-        render: function () {
-            var footer;
-            var main;
-            var todos = this.props.model.todos;
+        destroy: function()
+        {
 
-            var shownTodos = todos.filter(function (todo) {
-                switch (this.state.nowShowing) {
-                case app.ACTIVE_TODOS:
-                    return !todo.completed;
-                case app.COMPLETED_TODOS:
-                    return todo.completed;
-                default:
-                    return true;
+        },
+
+        addTagToFilter: function(tag)
+        {
+            if (filterTags.indexOf(tag) === -1) {
+                filterTags.push(tag);
+            }
+        },
+
+        clickTag: function(tag)
+        {
+            event.preventDefault();
+            this.addTagToFilter(tag)
+            $.ajax({
+                type: 'get',
+                data: {tags: ['1111','2222']},
+                url: this.props.loadAllUrl,
+                success: function (data) {
+                    var responseJson = $.parseJSON(data);
+//                    this.setState({
+//                        notes: responseJson.notes,
+//                        tags: responseJson.tags
+//                    });
+                    console.log(this.state);
+
+                }.bind(this),
+                // todo: error handling
+                error: function(xhr, status, err) {
+                    console.error(xhr, this.props.addUrl, status, err.toString());
                 }
-            }, this);
+            });
+        },
 
-            var todoItems = shownTodos.map(function (todo) {
+        render: function () {
+            console.log('current state notes:');
+            console.log(this.state.notes);
+            var notesHtml = this.state.notes.map(function (note) {
                 return (
-                    <TodoItem
-                        key={todo.id}
-                        todo={todo}
-                        onToggle={this.toggle.bind(this, todo)}
-                        onDestroy={this.destroy.bind(this, todo)}
-                        onEdit={this.edit.bind(this, todo)}
-                        editing={this.state.editing === todo.id}
-                        onSave={this.save.bind(this, todo)}
+                    <NoteComponent
+                        key={note.id}
+                        note={note}
+                        onDestroy={this.destroy.bind(this, note)}
+                        onEdit={this.edit.bind(this, note)}
+                        onSave={this.save.bind(this, note)}
                         onCancel={this.cancel}
                     />
                 );
             }, this);
-console.log('1');
-            var todoTags = this.props.tags.map(function (tag) {
+
+            var tagsHtml = this.state.tags.map(function (tag) {
                 return (
-                    <TodoTag
+                    <TagComponent
                         tag={tag}
+                        handleClick={this.clickTag.bind(this, tag)}
                     />
                 );
             }, this);
-            console.log('2');
+//var state = {"notes":{"aaa-bbb-111":{"note_id":1,"text":"note 1"},"aaa-bbb-222":{"note_id":2,"text":"note 2"},"aaa-bbb-333":{"note_id":3,"text":"note 3"}},"tags":{"ttt-bbb-111":{"tag_id":1,"name":"tag 1"},"ttt-bbb-222":{"tag_id":2,"name":"tag 2"},"ttt-bbb-333":{"tag_id":3,"name":"tag 3"}}};
+//var state = {"notes":[{"note_id":1,"text":"note 1"},{"note_id":2,"text":"note 2"},{"note_id":3,"text":"note 3"}],"tags":{"ttt-bbb-111":{"tag_id":1,"name":"tag 1"},"ttt-bbb-222":{"tag_id":2,"name":"tag 2"},"ttt-bbb-333":{"tag_id":3,"name":"tag 3"}}};
+//            console.log(state);
+//            var newNote = {"note_id":4,"text":"note 4"};
+//
+//            state.notes.unshift(newNote);
+//var noteId = 'note 2';
+//            state.notes = state.notes.filter(function (candidate) {
+//                return candidate.text !== noteId;
+//            });
+//
+//            console.log(state);
 
-            var todoUser = <TodoUser
-                        user={this.props.user}
-                    />;
-            console.log('3');
-
-            var activeTodoCount = todos.reduce(function (accum, todo) {
-                return todo.completed ? accum : accum + 1;
-            }, 0);
-
-            var completedCount = todos.length - activeTodoCount;
-
-            if (activeTodoCount || completedCount) {
-                footer =
-                    <TodoFooter
-                        count={activeTodoCount}
-                        completedCount={completedCount}
-                        nowShowing={this.state.nowShowing}
-                        onClearCompleted={this.clearCompleted}
-                    />;
-            }
-
-            if (todos.length) {
-                main = (
-                    <section id="main">
-
-                        <input
-                            id="toggle-all"
-                            type="checkbox"
-                            onChange={this.toggleAll}
-                            checked={activeTodoCount === 0}
-                        />
-
-                        <ul id="todo-list">
-                            {todoItems}
-                        </ul>
-                    </section>
-                );
-            }
 
             return (
                 <div>
-                    <header id="header">
-                        <div id="user">
-                            {todoUser}
+                    <div className="row">
+                        <div className="input-field col s6 offset-s2">
+                            <textarea
+                                id="mainInput"
+                                ref="mainInput"
+                                className="materialize-textarea"
+                                onKeyDown={this.handleNewNoteKeyDown}
+                                autoFocus={true}
+                            />
+                            <label for="main-input">New Note</label>
                         </div>
-                        <ul id="todo-tags">
-                            {todoTags}
-                        </ul>
-                        <h1>todos</h1>
-                        <textarea
-                            ref="newField"
-                            id="new-todo"
-                            placeholder="What needs to be done?"
-                            onKeyDown={this.handleNewTodoKeyDown}
-                            autoFocus={true}
-                        />
-                    </header>
-                    {main}
-                    {footer}
+                    </div>
+
+                    <div className="row">
+                        <div className="col s6 offset-s2 ">
+                            <ul className="collection">
+                                {notesHtml}
+                            </ul>
+                        </div>
+                        <div className="col s2">
+                            <div className="collection">
+                                {tagsHtml}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
         }
     });
 
-    var model = new app.TodoModel('react-todos');
+//    var model = new NoteApp.NoteModel('react-todos');
     // model.initialize();
 
-    var user = {};
-    var tags = {};
 
     function render(user, tags) {
-        console.log(user);
-        console.log(tags);
         React.render(
-            <TodoApp model={model} user={user} tags={tags} />,
-            document.getElementById('todoapp')
+            <Main loadAllUrl='/all' />,
+            document.getElementById('main')
         );
     }
 
-    model.subscribe('add', render);
-    model.subscribe('save', render);
-    model.subscribe('destroy', render);
-
-    $.get('/all', {}, function (response) {
-        var responseJson = $.parseJSON(response);
-        user = responseJson.user;
-        tags = responseJson.tags;
-        model.todos = responseJson.notes;
-        render(user, tags);
-    });
+    render();
+//    model.subscribe('add', render);
+//    model.subscribe('save', render);
+//    model.subscribe('destroy', render);
 
 })();

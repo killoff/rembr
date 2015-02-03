@@ -1,32 +1,41 @@
-<!doctype html>
-<html lang="en" data-framework="react">
+<html>
 <head>
-    <meta charset="utf-8">
-    <title>999 notes</title>
-    <link rel="stylesheet" href="<?php echo asset('bower_components/todomvc-common/base.css') ?>">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link type="text/css" rel="stylesheet" href="/css/local.css" media="screen,projection"/>
+    <!--<link type="text/css" rel="stylesheet" href="css/materialize.min.css" media="screen,projection"/>-->
 </head>
-<body>
-<section id="todoapp"></section>
-<footer id="info">
-    <p>Double-click to edit a todo</p>
+
+<body class="">
+<header>
+    <nav>
+        <div class="nav-wrapper">
+            <div class="col s12">
+                <a class="brand-logo">999notes</a>
+                <ul class="right side-nav">
+                    <li><a href="sass.html"><i class="mdi-action-search left"></i></a></li>
+                    <li><a href="components.html"><i class="mdi-action-view-module right"></i>Dmitriy Volik</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<main id="main"></main>
+<footer>
 </footer>
 
-<script src="<?php echo asset('bower_components/todomvc-common/base.js') ?>"></script>
+<!--Import jQuery before materialize.js-->
 <script src="<?php echo asset('bower_components/react/react-with-addons.js') ?>"></script>
 <script src="<?php echo asset('bower_components/react/JSXTransformer.js') ?>"></script>
 <script src="<?php echo asset('bower_components/director/build/director.js') ?>"></script>
-
 <script src="<?php echo asset('js/utils.js') ?>"></script>
-<script src="<?php echo asset('js/todoModel.js') ?>"></script>
-<!-- jsx is an optional syntactic sugar that transforms methods in React's
-`render` into an HTML-looking format. Since the two models above are
-unrelated to React, we didn't need those transforms. -->
-<script type="text/jsx" src="<?php echo asset('js/todoItem.jsx') ?>"></script>
-<script type="text/jsx" src="<?php echo asset('js/user.jsx') ?>"></script>
-<script type="text/jsx" src="<?php echo asset('js/tag.jsx') ?>"></script>
-<script type="text/jsx" src="<?php echo asset('js/footer.jsx') ?>"></script>
+<script type="text/jsx" src="<?php echo asset('js/app/note.jsx') ?>"></script>
+<script type="text/jsx" src="<?php echo asset('js/app/tag.jsx') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app.jsx') ?>"></script>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<!--<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>-->
+<script type="text/javascript" src="js/materialize.min.js"></script>
+<!--<script src="--><?php //echo asset('js/todoModel.js') ?><!--"></script>-->
 <script src="<?php echo asset('plugins/jquery.textcomplete.min.js') ?>"></script>
 </body>
 </html>

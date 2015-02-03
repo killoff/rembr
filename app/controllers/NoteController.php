@@ -7,23 +7,55 @@ class NoteController extends BaseController
     public function all()
     {
         $userId = Auth::id();
-        $response = array(
-            'notes' => array(),
-            'tags' => array()
-        );
+        $response = [
+            'notes' => [],
+            'tags' => []
+        ];
 
         if (!Auth::check()) {
             return json_encode($response);
         }
 
-        $response['notes'] = DB::select('select note_id, text, uuid from note where user_id=? order by updated_at desc limit ?',
-            array($userId, self::INITIAL_LIMIT)
+        $notes = DB::select('select note_id as id, text, uuid from note where user_id=? order by updated_at desc limit ?',
+            [$userId, self::INITIAL_LIMIT]
         );
-        $response['tags'] = DB::select('select tag_id, name from tag where user_id=? order by name', array($userId));
+        $tags = DB::select('select tag_id as id, name from tag where user_id=? order by name', [$userId]);
+        if (count($notes) > 0 && count($tags) > 0) {
+            $tagsAssoc = [];
+            foreach ($tags as $row) {
+                $tagsAssoc[$row->id] = $row;
+            }
 
+            $noteIds = [];
+            foreach ($notes as $note) {
+                $noteIds[] = $note->id;
+            }
+//            $noteTag = DB::select('select note_id, tag_id from note_tag where note_id IN(?)',
+//                [implode(',', $noteIds)]
+//            );
+            $noteTag = DB::table('note_tag')
+                ->whereIn('note_id', $noteIds)->get();
+            $noteTagIds = [];
+            foreach ($noteTag as $row) {
+                $noteTagIds[$row->note_id][] = $row->tag_id;
+            }
+            foreach ($notes as &$note) {
+                $note->tags = [];
+                if (!isset($noteTagIds[$note->id])) {
+                    continue;
+                }
+                foreach ($noteTagIds[$note->id] as $tagId) {
+                    $note->tags[] = [
+                        'id' => $tagId,
+                        'name' => $tagsAssoc[$tagId]->name
+                    ];
+                }
+            }
+        }
+
+        $response['notes'] = $notes;
+        $response['tags'] = $tags;
         $response['user'] = Auth::user();
-        $response['get_user'] = Auth::getUser();
-
         return json_encode($response);
     }
 
@@ -33,14 +65,14 @@ class NoteController extends BaseController
 //            if (!Request::isJson()) {
 //                throw new \Exception('Json required.');
 //            }
-            $note = json_decode(Request::instance()->getContent());
-            if (empty($note->text)) {
-                throw new \LogicException('Empty text');
-            }
             if (!Auth::check()) {
                 throw new \LogicException('Authorization failed');
             }
 
+            $note = json_decode(Request::instance()->getContent());
+            if (empty($note->text)) {
+                throw new \LogicException('Empty text');
+            }
             //  extract tags
             $tagsRegexp = str_replace(':', self::TAG_ENCLOSURE, '/\:([^\:\n\r\s]{1}[^\:\n\r]*)\:/');
             preg_match_all($tagsRegexp, $note->text, $matches);
@@ -54,20 +86,36 @@ class NoteController extends BaseController
                 array(
                     'user_id' => Auth::id(),
                     'text' => $note->text,
-                    'uuid' => $note->id,
+                    'uuid' => $note->uuid,
                     'created_at' => $now,
                     'updated_at' => $now
                 )
             );
 
             $this->saveTags($noteId, $matches[1]);
-
-            $response = array('noteId' => $noteId, 'text' => htmlspecialchars($note->text));
+            $this->createSearchIndex($noteId, $note->text, $matches[1]);
+            $response = array('id' => $noteId, 'uuid' => $note->uuid);
             return json_encode($response);
         } catch (\Exception $e) {
             $response = array('error' => $e->getMessage());
             return json_encode($response);
         }
+    }
+
+    private function createSearchIndex($noteId, $text, $tags)
+    {
+        $searchText = $text;
+        if (is_array($tags)) {
+            foreach ($tags as $tag) {
+//                $searchText .= $tag['uuid'] . ' ' . $tags['name'];
+                $searchText .= ' ' . $tag;
+            }
+        }
+        // todo: delete?
+//        DB::table('search_index')->where('note_id', '=', $noteId)->delete();
+        DB::table('search_index')->insert(
+            array('note_id' => $noteId, 'text' => $searchText)
+        );
     }
 
     public function listing()
