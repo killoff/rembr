@@ -55,6 +55,14 @@
   @include border-radius(7px);
 }
 
+.collection-item-local {
+  min-height: 45px;
+}
+
+.collection-item {
+  @extend .collection-item-local;
+}
+
 
 /* Sample */
 
@@ -89,9 +97,11 @@
 .dropdown-menu a:hover {
   cursor: pointer;
 }
+
 .textcomplete-item {
   font-size: 0.8rem;
 }
+
 .textcomplete-item a {
   color: #26a69a;
 }

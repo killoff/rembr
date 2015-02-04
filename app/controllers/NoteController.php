@@ -15,24 +15,65 @@ class NoteController extends BaseController
         if (!Auth::check()) {
             return json_encode($response);
         }
+        $tags = Input::get('tags');
+        $foundNotes = [];
+        $foundNoteIds = [];
+        if ($tags && is_array($tags) && count($tags) > 0) {
+            $sql = "select si.note_id from search_index si, note n where si.note_id=n.note_id and n.user_id=? and match(si.text) against (? IN BOOLEAN MODE) LIMIT 1000";
+            $matches = '';
+            foreach ($tags as $tag) {
+                $sign = '+';
+                if (strpos($tag, '-') === 0) {
+                    $sign = '-';
+                    $tag = substr_replace($tag,'',0,1);
+                }
+                $use_quotes = false;
+                if (strpos($tag,'-') || strpos($tag,'+') || strpos($tag,'.')) {
+                    $use_quotes = true;
+                }
+                $quote = $use_quotes ? '"' : '';
+                $matches .= " {$sign}{$quote}{$tag}*{$quote}";
+//                $sql_params[] = $tag;
+            }
+            $foundNotes = DB::select($sql, [$userId, $matches]);
+            $foundNoteIds = $this->fetchCol($foundNotes, 'note_id');
+        }
 
-        $notes = DB::select('select note_id as id, text, uuid from note where user_id=? order by updated_at desc limit ?',
-            [$userId, self::INITIAL_LIMIT]
-        );
-        $tags = DB::select('select tag_id as id, name from tag where user_id=? order by name', [$userId]);
+        $notesDb = DB::table('note')->select('note_id as id', 'text', 'uuid')
+            ->where('user_id', $userId)
+            ->orderBy('updated_at', 'desc');
+        if ($foundNoteIds) {
+            $notesDb->whereIn('note_id', $foundNoteIds);
+        }
+
+//        $notes = DB::select('select note_id as id, text, uuid from note where user_id=? order by updated_at desc limit ?',
+//            [$userId, self::INITIAL_LIMIT]
+//        );
+        $notes = $notesDb->get();
+        $noteIds = $this->fetchCol($notes, 'id');
+
+        $availableTagIds = [];
+        if ($foundNoteIds) {
+            $availableTags = DB::table('note_tag')->select('tag_id')
+                ->distinct()
+                ->whereIn('note_id', $noteIds)
+                ->get();
+            $availableTagIds = $this->fetchCol($availableTags, 'tag_id');
+        }
+
+        $tags = DB::select("select tag_id as id, 1 as available, name from tag where user_id=? order by name", [$userId]);
+
+        if ($availableTagIds) {
+            foreach ($tags as &$tag) {
+                $tag->available = in_array($tag->id, $availableTagIds) ? 1 : 0;
+            }
+        }
         if (count($notes) > 0 && count($tags) > 0) {
             $tagsAssoc = [];
             foreach ($tags as $row) {
                 $tagsAssoc[$row->id] = $row;
             }
 
-            $noteIds = [];
-            foreach ($notes as $note) {
-                $noteIds[] = $note->id;
-            }
-//            $noteTag = DB::select('select note_id, tag_id from note_tag where note_id IN(?)',
-//                [implode(',', $noteIds)]
-//            );
             $noteTag = DB::table('note_tag')
                 ->whereIn('note_id', $noteIds)->get();
             $noteTagIds = [];
@@ -55,8 +96,18 @@ class NoteController extends BaseController
 
         $response['notes'] = $notes;
         $response['tags'] = $tags;
-        $response['user'] = Auth::user();
+//        $response['fount_ids'] = $foundNotes;
+//        $response['user'] = Auth::user();
         return json_encode($response);
+    }
+
+    private function fetchCol($collection, $column)
+    {
+        $result = [];
+        foreach ($collection as $row) {
+            $result[] = $row->{$column};
+        }
+        return $result;
     }
 
     public function add()
@@ -74,14 +125,14 @@ class NoteController extends BaseController
                 throw new \LogicException('Empty text');
             }
             //  extract tags
-            $tagsRegexp = str_replace(':', self::TAG_ENCLOSURE, '/\:([^\:\n\r\s]{1}[^\:\n\r]*)\:/');
-            preg_match_all($tagsRegexp, $note->text, $matches);
-            if (isset($matches[1]) && count($matches[1]) > 0) {
-                foreach ($matches[0] as $tagWithEnclosure) {
-                    $note->text = str_replace($tagWithEnclosure, '', $note->text);
-                }
-            }
-            $now = $date = date('Y-m-d H:i:s', time());
+//            $tagsRegexp = str_replace(':', self::TAG_ENCLOSURE, '/\:([^\:\n\r\s]{1}[^\:\n\r]*)\:/');
+//            preg_match_all($tagsRegexp, $note->text, $matches);
+//            if (isset($matches[1]) && count($matches[1]) > 0) {
+//                foreach ($matches[0] as $tagWithEnclosure) {
+//                    $note->text = str_replace($tagWithEnclosure, '', $note->text);
+//                }
+//            }
+            $now = date('Y-m-d H:i:s', time());
             $noteId = DB::table('note')->insertGetId(
                 array(
                     'user_id' => Auth::id(),
@@ -92,8 +143,8 @@ class NoteController extends BaseController
                 )
             );
 
-            $this->saveTags($noteId, $matches[1]);
-            $this->createSearchIndex($noteId, $note->text, $matches[1]);
+            $this->saveTags($noteId, $note->tags);
+            $this->createSearchIndex($noteId, $note->text, $note->tags);
             $response = array('id' => $noteId, 'uuid' => $note->uuid);
             return json_encode($response);
         } catch (\Exception $e) {
@@ -108,7 +159,7 @@ class NoteController extends BaseController
         if (is_array($tags)) {
             foreach ($tags as $tag) {
 //                $searchText .= $tag['uuid'] . ' ' . $tags['name'];
-                $searchText .= ' ' . $tag;
+                $searchText .= ' ' . $tag->name;
             }
         }
         // todo: delete?
@@ -174,11 +225,11 @@ class NoteController extends BaseController
         $newTagIds = array();
         foreach ($tags as $tag) {
             $tagId = DB::table('tag')->where('user_id', Auth::id())
-                ->where('name', $tag)
+                ->where('name', $tag->name)
                 ->pluck('tag_id');
             if (!$tagId) {
                 $tagId = DB::table('tag')->insertGetId(
-                    array('user_id' => Auth::id(), 'name' => $tag)
+                    array('user_id' => Auth::id(), 'name' => $tag->name)
                 );
             }
             $newTagIds[] = $tagId;

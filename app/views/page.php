@@ -12,8 +12,8 @@
             <div class="col s12">
                 <a class="brand-logo">999notes</a>
                 <ul class="right side-nav">
-                    <li><a href="sass.html"><i class="mdi-action-search left"></i></a></li>
-                    <li><a href="components.html"><i class="mdi-action-view-module right"></i>Dmitriy Volik</a></li>
+                    <li><a href="#"><i class="mdi-action-search left"></i></a></li>
+                    <li><a href="#"><i class="mdi-action-view-module right"></i><?php echo $user->getAttribute('name'); ?></a></li>
                 </ul>
             </div>
         </div>

@@ -5,7 +5,6 @@
 /*global React, Router*/
 var NoteApp = NoteApp || {};
 
-var emojies = ['first', 'second', 'go go notes'];
 
 (function () {
     'use strict';
@@ -15,6 +14,8 @@ var emojies = ['first', 'second', 'go go notes'];
     var NoteComponent = NoteApp.Note;
     var TagComponent = NoteApp.Tag;
     var Utils = NoteApp.Utils;
+
+    var tags = [];
 
     var $mainInput;
 
@@ -44,7 +45,7 @@ var emojies = ['first', 'second', 'go go notes'];
                         notes: responseJson.notes,
                         tags: responseJson.tags
                     });
-                    console.log(this.state);
+                    tags = this.state.tags;
 
                 }.bind(this),
                 // todo: error handling
@@ -57,13 +58,14 @@ var emojies = ['first', 'second', 'go go notes'];
         initNoteForm: function()
         {
             $mainInput = $('#' + MAIN_INPUT_ID);
+//            $mainInput.focus();
             $mainInput.textcomplete([
                 {
                     match: /\B:([\-+\w]*)$/,
                     search: function (term, callback) {
-                        callback($.map(emojies, function (emoji) {
+                        callback($.map(tags, function (tag) {
 
-                            return emoji.indexOf(term) === 0 ? emoji : null;
+                            return tag.name.indexOf(term) === 0 ? tag.name : null;
                         }));
                     },
                     template: function (value) {
@@ -73,7 +75,8 @@ var emojies = ['first', 'second', 'go go notes'];
                         return ':' + value + ': ';
                     },
                     index: 1
-                },
+                }
+                /*,
                 {
                     words: ['apple', 'google', 'facebook', 'facesssbook', 'github'],
                     match: /\b(\w{2,})$/,
@@ -86,8 +89,8 @@ var emojies = ['first', 'second', 'go go notes'];
                     replace: function (word) {
                         return word + ' ';
                     }
-                }
-            ]);
+                }*/
+            ], { maxCount: 20});
         },
 
         updateState: function(key, value)
@@ -95,6 +98,9 @@ var emojies = ['first', 'second', 'go go notes'];
             var state = this.state;
             state[key] = value;
             this.setState(state);
+            if (key == 'tags') {
+                tags = this.state.tags;
+            }
         },
 
         handleNewNoteKeyDown: function (event) {
@@ -114,16 +120,42 @@ var emojies = ['first', 'second', 'go go notes'];
                         };
                     });
                 }
-
+                $.map(tags, function (tag) {
+                    noteText = noteText.replace(':'+tag.name+':', '');
+                });
                 var note = {
                     uuid: Utils.uuid(),
                     text: noteText,
                     tags: tags
-                }
+                };
                 var _stateNotes = this.state.notes;
                 _stateNotes.unshift(note);
-                this.updateState('notes', _stateNotes);
+
+                var _stateTags = this.state.tags;
+                if (tags.length > 0) {
+                    $.map(tags, function (tag) {
+                        if (!this.tagExists(tag)) {
+                            _stateTags.push(tag);
+                        }
+                    }.bind(this));
+                }
+                _stateTags.sort(function (a, b) {
+                    if (a.name > b.name) {
+                        return 1;
+                    }
+                    if (a.name < b.name) {
+                        return -1;
+                    }
+                    return 0;
+                });
+
+                this.setState({
+                    notes: _stateNotes,
+                    tags: _stateTags
+                });
+//                this.updateState('notes', _stateNotes);
 //                this.props.model.addNote(todo);
+//                console.log(this.state);
                 $mainInput.val('');
 
                 $.ajax({
@@ -131,14 +163,25 @@ var emojies = ['first', 'second', 'go go notes'];
                     url: '/note',
                     data: JSON.stringify(note),
                     success: function (data) {
-                        console.log('note added');
-                        console.log(data);
+//                        console.log('note added');
+//                        console.log(data);
                     }.bind(this),
                     error: function(xhr, status, err) {
                         console.error(xhr, this.props.addUrl, status, err.toString());
                     }.bind(this)
                 });
             }
+        },
+
+        tagExists: function(newTag)
+        {
+            // todo
+            for(var i=0; i < this.state.tags.length; i++) {
+                if (this.state.tags[i].name == newTag.name) {
+                    return true;
+                }
+            }
+            return false;
         },
 
         edit: function (todo, callback) {
@@ -169,27 +212,28 @@ var emojies = ['first', 'second', 'go go notes'];
 
         addTagToFilter: function(tag)
         {
-            if (filterTags.indexOf(tag) === -1) {
+            var index = filterTags.indexOf(tag);
+            if (index === -1) {
                 filterTags.push(tag);
+            } else {
+                filterTags.splice(index, 1);
             }
         },
 
         clickTag: function(tag)
         {
             event.preventDefault();
-            this.addTagToFilter(tag)
+            this.addTagToFilter(tag.name)
             $.ajax({
                 type: 'get',
-                data: {tags: ['1111','2222']},
+                data: {tags: filterTags},
                 url: this.props.loadAllUrl,
                 success: function (data) {
                     var responseJson = $.parseJSON(data);
-//                    this.setState({
-//                        notes: responseJson.notes,
-//                        tags: responseJson.tags
-//                    });
-                    console.log(this.state);
-
+                    this.setState({
+                        notes: responseJson.notes,
+                        tags: responseJson.tags
+                    });
                 }.bind(this),
                 // todo: error handling
                 error: function(xhr, status, err) {
@@ -199,8 +243,8 @@ var emojies = ['first', 'second', 'go go notes'];
         },
 
         render: function () {
-            console.log('current state notes:');
-            console.log(this.state.notes);
+//            console.log('current state notes:');
+//            console.log(this.state.notes);
             var notesHtml = this.state.notes.map(function (note) {
                 return (
                     <NoteComponent
@@ -214,11 +258,13 @@ var emojies = ['first', 'second', 'go go notes'];
                 );
             }, this);
 
+
             var tagsHtml = this.state.tags.map(function (tag) {
                 return (
                     <TagComponent
                         tag={tag}
                         handleClick={this.clickTag.bind(this, tag)}
+                        inFilter={filterTags.indexOf(tag.name)===-1 ? false : true}
                     />
                 );
             }, this);
@@ -253,14 +299,10 @@ var emojies = ['first', 'second', 'go go notes'];
 
                     <div className="row">
                         <div className="col s6 offset-s2 ">
-                            <ul className="collection">
-                                {notesHtml}
-                            </ul>
+                            {notesHtml.length > 0 ? <ul className="collection">{notesHtml}</ul> : ''}
                         </div>
                         <div className="col s2">
-                            <div className="collection">
-                                {tagsHtml}
-                            </div>
+                            {tagsHtml.length > 0 ? <div className="collection">{tagsHtml}</div> : ''}
                         </div>
                     </div>
                 </div>

@@ -27,13 +27,14 @@ var NoteApp = NoteApp || {};
          * just use it as an example of how little code it takes to get an order
          * of magnitude performance improvement.
          */
-        shouldComponentUpdate: function (nextProps, nextState) {
-        },
+//        shouldComponentUpdate: function (nextProps, nextState) {
+//        },
 
         render: function () {
             return (
-                <a href="#" className="collection-item green lighten-5" onClick={this.props.handleClick}>
+                <a href="#" className={this.props.tag.available ? 'collection-item green lighten-5' : 'collection-item grey lighten-5'} onClick={this.props.handleClick}>
                     {this.props.tag.name}
+                    {this.props.inFilter ? <i className="mdi-content-filter-list right" /> : ''}
                 </a>
             );
         }

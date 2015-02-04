@@ -68,7 +68,7 @@ var NoteApp = NoteApp || {};
             });
             return (
                 <div className="collection-item">
-                    {this.props.note.text}
+                    {this.props.note.text?this.props.note.text:'22'}
                     {tagsHtml}
                 </div>
             );
