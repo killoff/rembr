@@ -6475,6 +6475,9 @@ ul.side-nav.fixed .collapsible-body li.active {
   border-radius: 7px;
   background-clip: padding-box; }
 
+.note-tag-selected {
+  background-color: #f1f8e9; }
+
 #notes-list div.collection-item {
   padding: 10px 10px 10px 25px; }
 

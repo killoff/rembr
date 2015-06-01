@@ -12,7 +12,7 @@ var NoteApp = NoteApp || {};
             var editField = this.refs.editField.getDOMNode();
             this.props.onEdit(function () {
 
-            }.bind(this), editField);
+            }, editField);
             //this.setState({editText: this.props.note.text});
         },
 
@@ -49,6 +49,11 @@ var NoteApp = NoteApp || {};
 //            );
         },
 
+        clickTag: function(tag)
+        {
+            this.props.onClickTag(tag);
+        },
+
         delete: function(event)
         {
             event.preventDefault();
@@ -57,8 +62,13 @@ var NoteApp = NoteApp || {};
 
         render: function () {
             var tagsHtml = this.props.note.tags.map(function(tag) {
-                return <a href="" className="note-tag">{tag.name}</a>
-            });
+                var className = React.addons.classSet({
+                    'note-tag': true,
+                    'note-tag-selected': tag.selected
+                });
+                return <a href="#" className={className} onClick={this.clickTag.bind(this, tag)}>{tag.name}</a>
+            }.bind(this));
+            
             var className = React.addons.classSet({
                 'collection-item': true,
                 editing: this.props.editing

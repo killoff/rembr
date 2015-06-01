@@ -132,6 +132,7 @@ var NoteApp = NoteApp || {};
                     onSave={this.save.bind(this, note)}
                     onCancel={this.cancel}
                     editing={this.state.editing === note.uuid}
+                    onClickTag={this.clickTag.bind(this)}
                 />
             }, this);
 

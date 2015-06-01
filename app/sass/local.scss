@@ -50,9 +50,12 @@
   border-color: #424242;
   border: 1px solid #e0e0e0;
   margin-right: 2px;
-//  background-color: #f1f8e9 ;
   @include box-sizing(border-box);
   @include border-radius(7px);
+}
+
+.note-tag-selected  {
+  background-color: #f1f8e9;
 }
 
 //.collection-item-local {
