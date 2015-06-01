@@ -55,14 +55,18 @@
   @include border-radius(7px);
 }
 
-.collection-item-local {
-  min-height: 45px;
-}
+//.collection-item-local {
+////  min-height: 45px;
+//  padding: 15px 10px;
+//}
+//
+//.collection-item {
+//  @extend .collection-item-local;
+//}
 
-.collection-item {
-  @extend .collection-item-local;
+#notes-list div.collection-item {
+  padding: 10px 10px 10px 25px;
 }
-
 
 /* Sample */
 
@@ -104,4 +108,45 @@
 
 .textcomplete-item a {
   color: #26a69a;
+}
+
+#notes-list div.editing .edit {
+  display: block;
+}
+
+div.view {
+  position: relative;
+}
+div.view label {
+  position: relative;
+  font-size: 1rem;
+  color: #212121;
+}
+
+#notes-list div.editing .view {
+  display: none;
+}
+#notes-list div .edit {
+  display: none;
+}
+
+a.action-delete {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: -20px;
+  margin-top: -11px;
+  color: #ffccbc;
+  cursor: hand;
+}
+a.action-delete:hover {
+  color: #ff8a65;
+}
+
+#notes-list div:hover .action {
+  display: block;
+}
+
+a.icon-btn {
+  padding: 0 1rem;
 }

@@ -5,209 +5,99 @@
 /*global React, Router*/
 var NoteApp = NoteApp || {};
 
-
 (function () {
     'use strict';
     var ENTER_KEY = 13;
     var MAIN_INPUT_ID = 'mainInput';
-
-    var NoteComponent = NoteApp.Note;
-    var TagComponent = NoteApp.Tag;
-    var Utils = NoteApp.Utils;
-
-    var tags = [];
-
-    var $mainInput;
 
     var filterTags = [];
 
     var Main = React.createClass({
         getInitialState: function () {
             return {
-                notes: [],
-                tags: []
+                editing: null
             };
         },
 
         componentDidMount: function () {
-            this.syncWithServer();
-            this.initNoteForm();
+            this.props.storage.serverPull();
+            this.initInputField($('#' + MAIN_INPUT_ID));
         },
 
-        syncWithServer: function()
-        {
-            $.ajax({
-                type: 'get',
-                url: this.props.loadAllUrl,
-                success: function (data) {
-                    var responseJson = $.parseJSON(data);
-                    this.setState({
-                        notes: responseJson.notes,
-                        tags: responseJson.tags
-                    });
-                    tags = this.state.tags;
-
-                }.bind(this),
-                // todo: error handling
-                error: function(xhr, status, err) {
-                    console.error(xhr, this.props.addUrl, status, err.toString());
-                }
-            });
-        },
-
-        initNoteForm: function()
-        {
-            $mainInput = $('#' + MAIN_INPUT_ID);
-//            $mainInput.focus();
-            $mainInput.textcomplete([
+        initInputField: function(textarea) {
+            $(textarea).focus();
+            $(textarea).textcomplete([
                 {
-                    match: /\B:([\-+\w]*)$/,
+                    match: /\B!([^\n\r\s]*)$/,
                     search: function (term, callback) {
-                        callback($.map(tags, function (tag) {
-
+                        // todo: simplify tagsCollection structure
+                        callback($.map(this.props.storage.tagsCollection(), function (tag) {
                             return tag.name.indexOf(term) === 0 ? tag.name : null;
-                        }));
-                    },
+                        }.bind(this)));
+                    }.bind(this),
                     template: function (value) {
                         return value;
                     },
                     replace: function (value) {
-                        return ':' + value + ': ';
+                        return '!' + value + ' ';
                     },
                     index: 1
                 }
-                /*,
-                {
-                    words: ['apple', 'google', 'facebook', 'facesssbook', 'github'],
-                    match: /\b(\w{2,})$/,
-                    search: function (term, callback) {
-                        callback($.map(this.words, function (word) {
-                            return word.indexOf(term) === 0 ? word : null;
-                        }));
-                    },
-                    index: 1,
-                    replace: function (word) {
-                        return word + ' ';
-                    }
-                }*/
             ], { maxCount: 20});
         },
 
-        updateState: function(key, value)
-        {
-            var state = this.state;
-            state[key] = value;
-            this.setState(state);
-            if (key == 'tags') {
-                tags = this.state.tags;
-            }
-        },
-
-        handleNewNoteKeyDown: function (event) {
+        handleKeyboardSubmit: function (event) {
             if (!event.ctrlKey || event.keyCode !== ENTER_KEY) {
                 return;
             }
-
             event.preventDefault();
-            var noteText = $mainInput.val().trim();
+            var $inputField = $(event.target);
+            var noteText = $inputField.val().trim();
             if (noteText) {
-                var tags = noteText.match(/\:([^\:\n\r\s]{1}[^\:\n\r]*)\:/gi) || [];
-                if (tags.length > 0) {
-                    tags = tags.map(function(tag) {
-                        return {
-                            'uuid': Utils.uuid(),
-                            'name': tag.replace(/:/g, '')
-                        };
-                    });
-                }
-                $.map(tags, function (tag) {
-                    noteText = noteText.replace(':'+tag.name+':', '');
-                });
-                var note = {
-                    uuid: Utils.uuid(),
-                    text: noteText,
-                    tags: tags
-                };
-                var _stateNotes = this.state.notes;
-                _stateNotes.unshift(note);
-
-                var _stateTags = this.state.tags;
-                if (tags.length > 0) {
-                    $.map(tags, function (tag) {
-                        if (!this.tagExists(tag)) {
-                            _stateTags.push(tag);
-                        }
-                    }.bind(this));
-                }
-                _stateTags.sort(function (a, b) {
-                    if (a.name > b.name) {
-                        return 1;
-                    }
-                    if (a.name < b.name) {
-                        return -1;
-                    }
-                    return 0;
-                });
-
-                this.setState({
-                    notes: _stateNotes,
-                    tags: _stateTags
-                });
-//                this.updateState('notes', _stateNotes);
-//                this.props.model.addNote(todo);
-//                console.log(this.state);
-                $mainInput.val('');
-
-                $.ajax({
-                    type: 'post',
-                    url: '/note',
-                    data: JSON.stringify(note),
-                    success: function (data) {
-//                        console.log('note added');
-//                        console.log(data);
-                    }.bind(this),
-                    error: function(xhr, status, err) {
-                        console.error(xhr, this.props.addUrl, status, err.toString());
-                    }.bind(this)
-                });
+                $inputField.val('');
+                var note = new NoteApp.NoteObject(noteText);
+                this.props.storage.post(note);
             }
         },
 
-        tagExists: function(newTag)
-        {
-            // todo
-            for(var i=0; i < this.state.tags.length; i++) {
-                if (this.state.tags[i].name == newTag.name) {
-                    return true;
-                }
-            }
-            return false;
-        },
-
-        edit: function (todo, callback) {
+        edit: function (note, callback, editDomNode) {
             // refer to todoItem.js `handleEdit` for the reasoning behind the
             // callback
-            this.setState({editing: todo.id}, function () {
+            this.setState({editing: note.uuid}, function () {
+                this.initInputField(editDomNode);
                 callback();
             });
         },
 
-        save: function (todoToSave, text) {
-            this.props.model.save(todoToSave, text);
+        save: function (note, text, callback) {
+
+            var noteObject = new NoteApp.NoteObject(text.trim());
+            var tags = [];
+            var tagInStorage;
+            for (var i = 0; i < noteObject.tags.length; i++) {
+                tagInStorage = this.props.storage.getTagByName(noteObject.tags[i].name);
+                if (tagInStorage) {
+                    tags.push(tagInStorage);
+                } else {
+                    tags.push(noteObject.tags[i]);
+                }
+            }
+            console.log(tags);
+            note.text = noteObject.text;
+            note.tags = tags;
+            this.props.storage.put(note);
             this.setState({editing: null});
+            callback();
         },
 
         cancel: function () {
             this.setState({editing: null});
         },
 
-        clearCompleted: function () {
-            this.props.model.clearCompleted();
-        },
-
-        destroy: function()
+        destroy: function(note)
         {
-
+            // @todo check perms
+            this.props.storage.delete(note.uuid);
         },
 
         addTagToFilter: function(tag)
@@ -223,64 +113,37 @@ var NoteApp = NoteApp || {};
         clickTag: function(tag)
         {
             event.preventDefault();
-            this.addTagToFilter(tag.name)
-            $.ajax({
-                type: 'get',
-                data: {tags: filterTags},
-                url: this.props.loadAllUrl,
-                success: function (data) {
-                    var responseJson = $.parseJSON(data);
-                    this.setState({
-                        notes: responseJson.notes,
-                        tags: responseJson.tags
-                    });
-                }.bind(this),
-                // todo: error handling
-                error: function(xhr, status, err) {
-                    console.error(xhr, this.props.addUrl, status, err.toString());
-                }
-            });
+            console.log(tag);
+            if (tag.available) {
+                this.props.storage.toggleTagFilter(tag);
+                this.props.storage.serverPull();
+            }
         },
 
         render: function () {
-//            console.log('current state notes:');
-//            console.log(this.state.notes);
-            var notesHtml = this.state.notes.map(function (note) {
-                return (
-                    <NoteComponent
-                        key={note.id}
-                        note={note}
-                        onDestroy={this.destroy.bind(this, note)}
-                        onEdit={this.edit.bind(this, note)}
-                        onSave={this.save.bind(this, note)}
-                        onCancel={this.cancel}
-                    />
-                );
+            var NoteComponent = NoteApp.Note;
+            var notesHtml = this.props.storage.collection().map(function (note) {
+                //console.log(note);
+                return <NoteComponent
+                    key={note.uuid}
+                    note={note}
+                    onDestroy={this.destroy.bind(this, note)}
+                    onEdit={this.edit.bind(this, note)}
+                    onSave={this.save.bind(this, note)}
+                    onCancel={this.cancel}
+                    editing={this.state.editing === note.uuid}
+                />
             }, this);
 
-
-            var tagsHtml = this.state.tags.map(function (tag) {
+            var TagComponent = NoteApp.Tag;
+            var tagsHtml = this.props.storage.tagsCollection().map(function (tag) {
                 return (
                     <TagComponent
                         tag={tag}
-                        handleClick={this.clickTag.bind(this, tag)}
-                        inFilter={filterTags.indexOf(tag.name)===-1 ? false : true}
+                        onClick={this.clickTag.bind(this, tag)}
                     />
                 );
             }, this);
-//var state = {"notes":{"aaa-bbb-111":{"note_id":1,"text":"note 1"},"aaa-bbb-222":{"note_id":2,"text":"note 2"},"aaa-bbb-333":{"note_id":3,"text":"note 3"}},"tags":{"ttt-bbb-111":{"tag_id":1,"name":"tag 1"},"ttt-bbb-222":{"tag_id":2,"name":"tag 2"},"ttt-bbb-333":{"tag_id":3,"name":"tag 3"}}};
-//var state = {"notes":[{"note_id":1,"text":"note 1"},{"note_id":2,"text":"note 2"},{"note_id":3,"text":"note 3"}],"tags":{"ttt-bbb-111":{"tag_id":1,"name":"tag 1"},"ttt-bbb-222":{"tag_id":2,"name":"tag 2"},"ttt-bbb-333":{"tag_id":3,"name":"tag 3"}}};
-//            console.log(state);
-//            var newNote = {"note_id":4,"text":"note 4"};
-//
-//            state.notes.unshift(newNote);
-//var noteId = 'note 2';
-//            state.notes = state.notes.filter(function (candidate) {
-//                return candidate.text !== noteId;
-//            });
-//
-//            console.log(state);
-
 
             return (
                 <div>
@@ -290,19 +153,21 @@ var NoteApp = NoteApp || {};
                                 id="mainInput"
                                 ref="mainInput"
                                 className="materialize-textarea"
-                                onKeyDown={this.handleNewNoteKeyDown}
+                                onKeyDown={this.handleKeyboardSubmit}
                                 autoFocus={true}
                             />
-                            <label for="main-input">New Note</label>
+                            <label htmlFor="mainInput">New Note</label>
                         </div>
                     </div>
 
                     <div className="row">
                         <div className="col s6 offset-s2 ">
-                            {notesHtml.length > 0 ? <ul className="collection">{notesHtml}</ul> : ''}
+                            <ul className="collection" id="notes-list">{notesHtml}</ul>
                         </div>
                         <div className="col s2">
+                            <div className="row">
                             {tagsHtml.length > 0 ? <div className="collection">{tagsHtml}</div> : ''}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -310,20 +175,24 @@ var NoteApp = NoteApp || {};
         }
     });
 
-//    var model = new NoteApp.NoteModel('react-todos');
-    // model.initialize();
-
+    var Storage = new NoteApp.Storage('999notes');
 
     function render(user, tags) {
         React.render(
-            <Main loadAllUrl='/all' />,
+            <Main storage={Storage} />,
             document.getElementById('main')
         );
     }
 
     render();
-//    model.subscribe('add', render);
-//    model.subscribe('save', render);
-//    model.subscribe('destroy', render);
+
+    Storage.onChange(render);
 
 })();
+//<div className="row">
+//    <a className="btn btn-small waves-effect waves-light red">
+//        <i className="icon-sort-by-alphabet"></i>
+//    </a>
+//    <i className="icon-sort-by-attributes"></i>
+//    <i className="icon-sort-by-order-alt"></i>
+//</div>

@@ -1,8 +1,3 @@
-/*jshint quotmark: false */
-/*jshint white: false */
-/*jshint trailing: false */
-/*jshint newcap: false */
-/*global React */
 var NoteApp = NoteApp || {};
 
 (function () {
@@ -11,45 +6,37 @@ var NoteApp = NoteApp || {};
     var ESCAPE_KEY = 27;
     var ENTER_KEY = 13;
 
-    NoteApp.Note = React.createClass({
-        handleSubmit: function (event) {
-            var val = this.state.editText;
-            if (val) {
-                this.props.onSave(val);
-                this.setState({editText: val});
-            } else {
-                this.props.onDestroy();
-            }
+    NoteApp.Note = React.createClass(
+    {
+        handleEdit: function () {
+            var editField = this.refs.editField.getDOMNode();
+            this.props.onEdit(function () {
+
+            }.bind(this), editField);
+            //this.setState({editText: this.props.note.text});
         },
 
-        handleEdit: function () {
-            // react optimizes renders by batching them. This means you can't call
-            // parent's `onEdit` (which in this case triggeres a re-render), and
-            // immediately manipulate the DOM as if the rendering's over. Put it as a
-            // callback. Refer to app.jsx' `edit` method
-            this.props.onEdit(function () {
-                var node = this.refs.editField.getDOMNode();
-                node.focus();
-                node.setSelectionRange(node.value.length, node.value.length);
-            }.bind(this));
-            this.setState({editText: this.props.note.text});
+        handleSubmit: function () {
+            var newText = this.refs.editField.getDOMNode().value;
+            this.props.onSave(newText, function() {
+            });
         },
 
         handleKeyDown: function (event) {
             if (event.which === ESCAPE_KEY) {
-                this.setState({editText: this.props.note.text});
                 this.props.onCancel(event);
-            } else if (event.which === ENTER_KEY) {
-                this.handleSubmit(event);
+            }
+            if (event.ctrlKey && event.keyCode === ENTER_KEY) {
+                this.handleSubmit();
             }
         },
 
-        handleChange: function (event) {
-            this.setState({editText: event.target.value});
-        },
-
-        getInitialState: function () {
-            return {editText: this.props.note.text};
+        getEditText: function () {
+            var text = this.props.note.text;
+            for (var i = 0; i < this.props.note.tags.length; i++) {
+                text += (i == 0 ? "\n" : " ") + "!" + this.props.note.tags[i].name;
+            }
+            return text;
         },
 
         shouldComponentUpdate: function (nextProps, nextState) {
@@ -62,14 +49,38 @@ var NoteApp = NoteApp || {};
 //            );
         },
 
+        delete: function(event)
+        {
+            event.preventDefault();
+            this.props.onDestroy();
+        },
+
         render: function () {
-            var tagsHtml = this.props.note.tags.map(function(noteTag) {
-                return <a href="" className="note-tag">{noteTag.name}</a>
+            var tagsHtml = this.props.note.tags.map(function(tag) {
+                return <a href="" className="note-tag">{tag.name}</a>
+            });
+            var className = React.addons.classSet({
+                'collection-item': true,
+                editing: this.props.editing
             });
             return (
-                <div className="collection-item">
-                    {this.props.note.text?this.props.note.text:'22'}
-                    {tagsHtml}
+                <div className={className}>
+                    <div className="view">
+                        <a onClick={this.delete} className="action action-delete">
+                            <i className="tiny mdi-action-highlight-remove"></i>
+                        </a>
+                        <label onDoubleClick={this.handleEdit}>
+                            {this.props.note.text?this.props.note.text:''}
+                        </label>
+                        {tagsHtml}
+                    </div>
+                    <textarea
+                        ref="editField"
+                        className="edit materialize-textarea"
+                        defaultValue={this.getEditText()}
+                        onBlur={this.handleSubmit}
+                        onKeyDown={this.handleKeyDown}
+                    />
                 </div>
             );
         }

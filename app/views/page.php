@@ -2,6 +2,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <link type="text/css" rel="stylesheet" href="/css/local.css" media="screen,projection"/>
+    <link href="//netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css" rel="stylesheet">
     <!--<link type="text/css" rel="stylesheet" href="css/materialize.min.css" media="screen,projection"/>-->
 </head>
 
@@ -29,6 +30,8 @@
 <script src="<?php echo asset('bower_components/react/JSXTransformer.js') ?>"></script>
 <script src="<?php echo asset('bower_components/director/build/director.js') ?>"></script>
 <script src="<?php echo asset('js/utils.js') ?>"></script>
+<script src="<?php echo asset('js/storage.js') ?>"></script>
+<script src="<?php echo asset('js/note.js') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app/note.jsx') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app/tag.jsx') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app.jsx') ?>"></script>

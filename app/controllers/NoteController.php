@@ -15,237 +15,335 @@ class NoteController extends BaseController
         if (!Auth::check()) {
             return json_encode($response);
         }
-        $tags = Input::get('tags');
-        $foundNotes = [];
-        $foundNoteIds = [];
-        if ($tags && is_array($tags) && count($tags) > 0) {
-            $sql = "select si.note_id from search_index si, note n where si.note_id=n.note_id and n.user_id=? and match(si.text) against (? IN BOOLEAN MODE) LIMIT 1000";
-            $matches = '';
-            foreach ($tags as $tag) {
-                $sign = '+';
-                if (strpos($tag, '-') === 0) {
-                    $sign = '-';
-                    $tag = substr_replace($tag,'',0,1);
-                }
-                $use_quotes = false;
-                if (strpos($tag,'-') || strpos($tag,'+') || strpos($tag,'.')) {
-                    $use_quotes = true;
-                }
-                $quote = $use_quotes ? '"' : '';
-                $matches .= " {$sign}{$quote}{$tag}*{$quote}";
-//                $sql_params[] = $tag;
-            }
-            $foundNotes = DB::select($sql, [$userId, $matches]);
-            $foundNoteIds = $this->fetchCol($foundNotes, 'note_id');
-        }
 
-        $notesDb = DB::table('note')->select('note_id as id', 'text', 'uuid')
-            ->where('user_id', $userId)
-            ->orderBy('updated_at', 'desc');
-        if ($foundNoteIds) {
-            $notesDb->whereIn('note_id', $foundNoteIds);
-        }
+        $filters = json_decode(Input::get('filter'), true);
+        $searchStrings = $this->convertToSearchStrings($filters);
+        //print_r($searchStrings);
+        $filterNoteIds = [];
+        if (count($searchStrings) > 0) {
+            // create search string like '+"tag1" +"tag2" +"tag3"'
+            $searchString = '+"' . implode('" +"', $searchStrings) . '"';
 
-//        $notes = DB::select('select note_id as id, text, uuid from note where user_id=? order by updated_at desc limit ?',
-//            [$userId, self::INITIAL_LIMIT]
-//        );
-        $notes = $notesDb->get();
-        $noteIds = $this->fetchCol($notes, 'id');
+            $filterNoteIds = DB::table('search_index')
+                ->select('search_index.note_id')
+                ->join('note', 'search_index.note_id', '=', 'note.note_id')
+                ->where('note.user_id', $userId)
+                ->whereRaw('MATCH(search_index.text) AGAINST (? IN BOOLEAN MODE)', [$searchString])
+                ->lists('note_id');
 
-        $availableTagIds = [];
-        if ($foundNoteIds) {
-            $availableTags = DB::table('note_tag')->select('tag_id')
-                ->distinct()
-                ->whereIn('note_id', $noteIds)
-                ->get();
-            $availableTagIds = $this->fetchCol($availableTags, 'tag_id');
-        }
-
-        $tags = DB::select("select tag_id as id, 1 as available, name from tag where user_id=? order by name", [$userId]);
-
-        if ($availableTagIds) {
-            foreach ($tags as &$tag) {
-                $tag->available = in_array($tag->id, $availableTagIds) ? 1 : 0;
-            }
-        }
-        if (count($notes) > 0 && count($tags) > 0) {
-            $tagsAssoc = [];
-            foreach ($tags as $row) {
-                $tagsAssoc[$row->id] = $row;
-            }
-
-            $noteTag = DB::table('note_tag')
-                ->whereIn('note_id', $noteIds)->get();
-            $noteTagIds = [];
-            foreach ($noteTag as $row) {
-                $noteTagIds[$row->note_id][] = $row->tag_id;
-            }
-            foreach ($notes as &$note) {
-                $note->tags = [];
-                if (!isset($noteTagIds[$note->id])) {
-                    continue;
-                }
-                foreach ($noteTagIds[$note->id] as $tagId) {
-                    $note->tags[] = [
-                        'id' => $tagId,
-                        'name' => $tagsAssoc[$tagId]->name
-                    ];
-                }
+            // for searches that don't return any results
+            if (empty($filterNoteIds)) {
+                $filterNoteIds = [-1];
             }
         }
 
-        $response['notes'] = $notes;
-        $response['tags'] = $tags;
-//        $response['fount_ids'] = $foundNotes;
-//        $response['user'] = Auth::user();
+        $notes = DB::table('note')
+            ->select(DB::raw('note.note_id AS id, note.text, note.uuid, GROUP_CONCAT(note_tag.tag_id) AS tag_ids'))
+            ->leftJoin('note_tag', 'note.note_id', '=', 'note_tag.note_id')
+            ->where('note.user_id', $userId)
+            ->groupBy('note.note_id')
+            ->orderBy('note.created_at', 'desc');
+
+        if ($filterNoteIds) {
+            $notes->whereIn('note.note_id', $filterNoteIds);
+        }
+
+        $tags = DB::table('tag')
+            ->select('tag.tag_id as id', 'name', 'tag.uuid')
+            ->join('note_tag', 'note_tag.tag_id', '=', 'tag.tag_id')
+            ->groupBy('tag.tag_id')
+            ->whereUserId($userId);
+
+        $response['notes'] = $notes->get();
+        $response['tags'] = $tags->get();
+
         return json_encode($response);
     }
 
-    private function fetchCol($collection, $column)
+    private function convertToSearchStrings($filters)
     {
-        $result = [];
-        foreach ($collection as $row) {
-            $result[] = $row->{$column};
+        if (!is_array($filters)) {
+            return [];
         }
-        return $result;
+        $result = [];
+        foreach ($filters as $key => $values) {
+            if (!is_array($values)) {
+                continue;
+            }
+            $result = array_merge($result, $values);
+        }
+        return array_unique($result);
     }
 
-    public function add()
+    public function save()
     {
         try {
-//            if (!Request::isJson()) {
-//                throw new \Exception('Json required.');
-//            }
+
             if (!Auth::check()) {
-                throw new \LogicException('Authorization failed');
+                throw new \LogicException('Authorization failed.');
             }
 
             $note = json_decode(Request::instance()->getContent());
-            if (empty($note->text)) {
-                throw new \LogicException('Empty text');
-            }
-            //  extract tags
-//            $tagsRegexp = str_replace(':', self::TAG_ENCLOSURE, '/\:([^\:\n\r\s]{1}[^\:\n\r]*)\:/');
-//            preg_match_all($tagsRegexp, $note->text, $matches);
-//            if (isset($matches[1]) && count($matches[1]) > 0) {
-//                foreach ($matches[0] as $tagWithEnclosure) {
-//                    $note->text = str_replace($tagWithEnclosure, '', $note->text);
-//                }
-//            }
-            $now = date('Y-m-d H:i:s', time());
-            $noteId = DB::table('note')->insertGetId(
-                array(
-                    'user_id' => Auth::id(),
-                    'text' => $note->text,
-                    'uuid' => $note->uuid,
-                    'created_at' => $now,
-                    'updated_at' => $now
-                )
-            );
 
-            $this->saveTags($noteId, $note->tags);
-            $this->createSearchIndex($noteId, $note->text, $note->tags);
-            $response = array('id' => $noteId, 'uuid' => $note->uuid);
-            return json_encode($response);
+            if (! $note instanceof \stdClass) {
+                throw new \DomainException('note must be an object.');
+            }
+            if (empty($note->uuid)) {
+                throw new \DomainException('note.uuid not found, unable to save.');
+            }
+            if (empty($note->text) && empty($note->tags)) {
+                throw new \DomainException('note.text and note.tags are empty, unable to save.');
+            }
+
+            $now = date('Y-m-d H:i:s', time());
+
+            $existing = DB::table('note')->whereUuid($note->uuid)->whereUserId(Auth::id())->first();
+
+            if ($existing === null) {
+                $noteId = DB::table('note')->insertGetId(
+                    array(
+                        'user_id' => Auth::id(),
+                        'text' => $note->text,
+                        'uuid' => $note->uuid,
+                        'created_at' => $now,
+                        'updated_at' => $now
+                    )
+                );
+            } else {
+                $noteId = $existing->note_id;
+                DB::table('note')->whereNoteId($noteId)
+                    ->update(['text' => $note->text, 'updated_at' => $now]);
+            }
+
+            if ($noteId) {
+                $this->saveTags($noteId, $note->tags);
+                $this->updateSearchIndex($noteId);
+                $response = array('uuid' => $note->uuid);
+                return json_encode($response);
+            } else {
+                throw new \Exception('note.id not generated, unable to save.');
+            }
+
         } catch (\Exception $e) {
             $response = array('error' => $e->getMessage());
             return json_encode($response);
         }
     }
 
-    private function createSearchIndex($noteId, $text, $tags)
+    public function delete()
     {
-        $searchText = $text;
-        if (is_array($tags)) {
-            foreach ($tags as $tag) {
-//                $searchText .= $tag['uuid'] . ' ' . $tags['name'];
-                $searchText .= ' ' . $tag->name;
-            }
+        $uuid = Input::get('uuid');
+        if (!Auth::check()) {
+            return;
         }
-        // todo: delete?
-//        DB::table('search_index')->where('note_id', '=', $noteId)->delete();
-        DB::table('search_index')->insert(
-            array('note_id' => $noteId, 'text' => $searchText)
-        );
-    }
-
-    public function listing()
-    {
-        $notes = array();
-        $userId = Auth::id();
-        if ($userId) {
-            $tags = Request::get('tag_ids');
-            if ($tags) {
-                $notes = DB::table('note')->select(DB::raw('note.*, count(*) total'))
-                    ->join('tag', 'note.user_id', '=', 'tag.user_id')
-                    ->join('note_tag', 'note.note_id', '=', DB::raw('note_tag.note_id'))
-                    ->where('note.user_id', $userId)
-                    ->where('note_tag.tag_id', '=', DB::raw('tag.tag_id'))
-                    ->whereIn('tag.name', $tags)
-                    ->groupBy('note.note_id')
-                    ->having('total', '=', count($tags))
-                    ->get();
-//                echo DB::table('note')->select(DB::raw('*, count(*) total'))
-//                    ->join('tag', 'note.user_id', '=', 'tag.user_id')
-//                    ->join('note_tag', 'note.note_id', '=', 'note_tag.note_id')
-//                    ->where('note.user_id', $userId)
-//                    ->where('note_tag.tag_id', '=', 'tag.tag_id')
-//                    ->whereIn('tag.name', $tags)
-//                    ->groupBy('note.note_isd')
-//                    ->having('total', '=', count($tags));
-//                $notes = DB::select("SELECT n.*, count(*) total
-//                                FROM note n, note_tag nt, tag t
-//                                WHERE AND t.name IN(?) nt.tag_id=t.tag_id
-//                                GROUP BY n.note_id having total=?", array($userId, $userId, $$tags, count($tags)));
-//                $notes = DB::select("SELECT n.*, count(*) total
-//                                FROM note n, note_tag nt, tag t
-//                                WHERE n.user_id=? AND t.user_id=? AND t.name IN(?) AND n.note_id=nt.note_id AND nt.tag_id=t.tag_id
-//                                GROUP BY n.note_id having total=?", array($userId, $userId, $$tags, count($tags)));
-            } else {
-                $notes = DB::table('note')
-                    ->select(DB::raw('uuid AS id, note_id AS numeric_id, text'))
-                    ->where('user_id', $userId)
-                    ->limit(50)
-                    ->get();
-            }
+        $note = DB::table('note')->whereUserId(Auth::id())->whereUuid($uuid)->first();
+        if ($note !== null) {
+            DB::table('note')->whereNoteId($note->note_id)->delete();
+            DB::table('note_tag')->whereNoteId($note->note_id)->delete();
+            DB::table('search_index')->whereNoteId($note->note_id)->delete();
         }
-        return json_encode($notes);
-
     }
 
     protected function saveTags($noteId, $tags)
     {
-        $noteTagIds = DB::table('note_tag')->where('note_id', $noteId)->lists('tag_id');
-        // delete old tags
-        if (count($noteTagIds) > 0) {
-            DB::table('note_tag')->where('note_id', $noteId)->delete();
-        }
-
-        $result = array();
-        $newTagIds = array();
+        $noteTagIds = DB::table('note_tag')->whereNoteId($noteId)->lists('tag_id');
+        $newTagIds = [];
         foreach ($tags as $tag) {
-            $tagId = DB::table('tag')->where('user_id', Auth::id())
-                ->where('name', $tag->name)
+            $tagId = DB::table('tag')
+                ->whereUserId(Auth::id())
+                ->whereName($tag->name)
                 ->pluck('tag_id');
             if (!$tagId) {
                 $tagId = DB::table('tag')->insertGetId(
-                    array('user_id' => Auth::id(), 'name' => $tag->name)
+                    [
+                        'user_id' => Auth::id(),
+                        'name' => $tag->name,
+                        'uuid' => $tag->uuid ? $tag->uuid : $this->generateUuid()
+                    ]
                 );
             }
             $newTagIds[] = $tagId;
-            $result[] = $tag;
         }
 
-        // save new tags
-        if (count($newTagIds)) {
-            $insertData = array();
-            foreach ($newTagIds as $tagId) {
+        $noteTagIds = array_unique($noteTagIds);
+        $newTagIds = array_unique($newTagIds);
+
+        $tagIdsToDelete = array_diff($noteTagIds, $newTagIds);
+        if (count($tagIdsToDelete) > 0) {
+            DB::table('note_tag')->whereIn('tag_id', $tagIdsToDelete)->delete();
+        }
+
+        $tagIdsToInsert = array_diff($newTagIds, $noteTagIds);
+        if (count($tagIdsToInsert) > 0) {
+            //$this->debug($tagIdsToInsert, 'tagIdsToInsert');
+            $insertData = [];
+            foreach ($tagIdsToInsert as $tagId) {
                 $insertData[] =  array('note_id' => $noteId, 'tag_id' => $tagId);
             }
+            //$this->debug($insertData, 'insert data');
             DB::table('note_tag')->insert($insertData);
         }
-        return $result;
+
+        return $newTagIds;
     }
 
+    private function updateSearchIndex($noteId)
+    {
+        // @todo: insert on dublicate key update
+        DB::transaction(function() use ($noteId)
+        {
+            DB::table('search_index')->whereNoteId($noteId)->delete();
+            DB::statement(
+                "INSERT INTO search_index
+                    SELECT n.note_id, CONCAT_WS(',', n.text, GROUP_CONCAT(t.uuid), GROUP_CONCAT(t.name))
+                    FROM note n
+                        LEFT JOIN note_tag nt ON n.note_id=nt.note_id
+                        LEFT JOIN tag t ON nt.tag_id=t.tag_id
+                    WHERE n.note_id=:note_id
+                    GROUP BY n.note_id",
+                ['note_id' => $noteId]
+            );
+        });
+    }
+
+    private function generateUuid()
+    {
+        return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+
+            // 32 bits for "time_low"
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+
+            // 16 bits for "time_mid"
+            mt_rand(0, 0xffff),
+
+            // 16 bits for "time_hi_and_version",
+            // four most significant bits holds version number 4
+            mt_rand(0, 0x0fff) | 0x4000,
+
+            // 16 bits, 8 bits for "clk_seq_hi_res",
+            // 8 bits for "clk_seq_low",
+            // two most significant bits holds zero and one for variant DCE1.1
+            mt_rand(0, 0x3fff) | 0x8000,
+
+            // 48 bits for "node"
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+    }
+
+    public function test()
+    {
+    return;
+DB::connection()->enableQueryLog();
+$userId=1;
+
+        $notes = DB::table('note')
+            ->select(DB::raw('note.note_id AS id, note.text, note.uuid, GROUP_CONCAT(note_tag.tag_id) AS tag_ids'))
+            ->leftJoin('note_tag', 'note.note_id', '=', 'note_tag.note_id')
+            ->where('note.user_id', $userId)
+            ->groupBy('note.note_id')
+            ->orderBy('note.updated_at', 'desc');
+print_R($notes->get());
+return;
+
+$tags = ["848ecde8-52d3-4829-8b9d-adaa246fc7f9"];
+$userId=1;
+ $searchString = '+"' . implode('" +"', $tags) . '"';
+print_r($res);
+             $sql = "SELECT si.note_id
+                     FROM search_index si, note n
+                     WHERE
+                         si.note_id=n.note_id
+                         AND n.user_id=?
+                         AND MATCH(si.text) AGAINST (? IN BOOLEAN MODE)
+                     LIMIT 1000";
+             // create search string like '+"tag1" +"tag2" +"tag3"'
+  //           $foundNotes = DB::select($sql, [$userId, $searchString])->lists('note_id');
+//print_r($foundNotes);
+       print_r(DB::getQueryLog());
+return;
+     $res =  DB::select('select concat(n.text, group_concat(t.uuid)) from note n left join note_tag nt on n.note_id=nt.note_id left join tag t on nt.tag_id=t.tag_id where n.note_id=86 group by n.note_id');
+     var_dump($res);
+     return;
+    $tags = [];
+    $tag = new stdClass();
+    $tag->name = 'one';
+    $tag->uuid = '111';
+    $tags[] = $tag;
+    $tag = new stdClass();
+    $tag->name = 'two';
+    $tag->uuid = '222';
+    $tags[] = $tag;
+    $tag = new stdClass();
+    $tag->name = 'three';
+    $tag->uuid = '333';
+    $tags[] = $tag;
+    var_dump($tags);
+    $this->saveTags(86, $tags);
+    //var_dump(DB::table('note_tag')->whereNoteId(3333333333)->lists('tag_id'));
+    //$noteTags = [7,5,3,1];
+    //$newTags = [2,3,4,7];
+
+    //echo 'tags to delete: '.implode(',',array_diff($noteTags, $newTags));
+    //echo 'tags to insert: '.implode(',',array_diff($newTags, $noteTags));
+    //    echo $this->generateUuid();
+//        $user = DB::table('note')->whereNoteId(86)->whereUserId(3)->first();
+  //      var_dump($user);
+
+
+    }
+
+    public function updateUuids()
+    {
+    return;
+
+        $notes = DB::table('note')->where('uuid', '')->get();
+        $tags = DB::table('tag')->where('uuid', '')->get();
+        //print_R($notes);
+        //print_R($tags);
+        //exit;
+        foreach ($notes as $note) {
+            DB::table('note')
+                ->where('note_id', $note->note_id)
+                ->update(['uuid' => $this->generateUuid()]);
+        }
+
+        foreach ($tags as $tag) {
+            DB::table('tag')
+                ->where('tag_id', $tag->tag_id)
+                ->update(['uuid' => $this->generateUuid()]);
+        }
+
+        $notes = DB::table('note')->get();
+        foreach ($notes as $note) {
+            $this->updateSearchIndex($note->note_id);
+        }
+
+        return;
+        $oldnotes = DB::table('noteold')->where('user_id', '8')->get();
+        foreach($oldnotes as $note) {
+            $newnote = DB::table('note')->where('text', $note->text)->where('user_id', 5)->first();
+            $oldnotetags = DB::table('note_tagold')->where('note_id', $note->note_id)->get();
+            foreach ($oldnotetags as $oldNoteTag) {
+                $oldTag = DB::table('tagold')->where('tag_id', $oldNoteTag->tag_id)->first();
+                $newTag = DB::table('tag')->where('name', $oldTag->name)->where('user_id', '5')->first();
+                echo $newnote->note_id.' => '.$newTag->tag_id.'<br>';
+                DB::table('note_tag')->insert(['note_id' => $newnote->note_id, 'tag_id' => $newTag->tag_id]);
+            }
+        }
+//            print_R($newnote);
+            exit;
+
+
+    }
+
+    private function debug($data, $key = '')
+    {
+        $log = "\n\n[".date('d.m.Y H:i:s').'] ' . $key . ': ';
+        $log .= is_string($data) ? $data : "\n".print_r($data,1);
+        $log .= "\n";
+        $file = '/var/nginx/laravel/app/storage/debug.log';
+        $log = is_file($file) ? file_get_contents($file) . $log : $log;
+        file_put_contents($file, $log);
+    }
 
 }
