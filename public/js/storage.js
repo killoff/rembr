@@ -260,7 +260,14 @@ var NoteApp = NoteApp || {};
     NoteApp.Storage.prototype.sortTags = function ()
     {
         this.tags.sort(function (one, two) {
-            return one.name.localeCompare(two.name);
+            //return one.name.localeCompare(two.name);
+            if (one.total < two.total) {
+                return 1;
+            }
+            if (one.total > two.total) {
+                return -1;
+            }
+            return 0;
         });
     };
 

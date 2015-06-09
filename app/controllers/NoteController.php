@@ -6,6 +6,7 @@ class NoteController extends BaseController
 
     public function all()
     {
+//    Auth::loginUsingId(5);
         $userId = Auth::id();
         $response = [
             'notes' => [],
@@ -49,7 +50,7 @@ class NoteController extends BaseController
         }
 
         $tags = DB::table('tag')
-            ->select('tag.tag_id as id', 'name', 'tag.uuid')
+            ->select('tag.tag_id as id', 'name', 'tag.uuid', DB::raw('count(*) as total'))
             ->join('note_tag', 'note_tag.tag_id', '=', 'tag.tag_id')
             ->groupBy('tag.tag_id')
             ->whereUserId($userId);

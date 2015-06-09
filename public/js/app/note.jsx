@@ -68,9 +68,9 @@ var NoteApp = NoteApp || {};
                 });
                 return <a href="#" className={className} onClick={this.clickTag.bind(this, tag)}>{tag.name}</a>
             }.bind(this));
-            
+
             var className = React.addons.classSet({
-                'collection-item': true,
+                'note-collection-item': true,
                 editing: this.props.editing
             });
             return (
@@ -82,7 +82,9 @@ var NoteApp = NoteApp || {};
                         <label onDoubleClick={this.handleEdit}>
                             {this.props.note.text?this.props.note.text:''}
                         </label>
-                        {tagsHtml}
+                        <div className="note-tags">
+                            {tagsHtml}
+                        </div>
                     </div>
                     <textarea
                         ref="editField"

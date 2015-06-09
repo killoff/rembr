@@ -137,7 +137,10 @@ var NoteApp = NoteApp || {};
             }, this);
 
             var TagComponent = NoteApp.Tag;
-            var tagsHtml = this.props.storage.tagsCollection().map(function (tag) {
+            var availableTags = this.props.storage.tagsCollection().filter(function(tag) {
+                return tag.available;
+            });
+            var tagsHtml = availableTags.map(function (tag) {
                 return (
                     <TagComponent
                         tag={tag}
@@ -165,7 +168,7 @@ var NoteApp = NoteApp || {};
                         <div className="col s6 offset-s2 ">
                             <ul className="collection" id="notes-list">{notesHtml}</ul>
                         </div>
-                        <div className="col s2">
+                        <div className="col s2 fixed">
                             <div className="row">
                             {tagsHtml.length > 0 ? <div className="collection">{tagsHtml}</div> : ''}
                             </div>
