@@ -1,5 +1,5 @@
 <?php
-class OauthController extends BaseController
+class OauthController extends Controller
 {
     public function google()
     {

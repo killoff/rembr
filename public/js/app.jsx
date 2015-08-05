@@ -21,10 +21,10 @@ var NoteApp = NoteApp || {};
 
         componentDidMount: function () {
             this.props.storage.serverPull();
-            this.initInputField($('#' + MAIN_INPUT_ID));
+            this.initTextarea($('#' + MAIN_INPUT_ID));
         },
 
-        initInputField: function(textarea) {
+        initTextarea: function(textarea) {
             $(textarea).focus();
             $(textarea).textcomplete([
                 {
@@ -46,55 +46,62 @@ var NoteApp = NoteApp || {};
             ], { maxCount: 20});
         },
 
-        handleKeyboardSubmit: function (event) {
+        handleHotKeySubmit: function (event) {
             if (!event.ctrlKey || event.keyCode !== ENTER_KEY) {
                 return;
             }
             event.preventDefault();
+
             var $inputField = $(event.target);
             var noteText = $inputField.val().trim();
+
             if (noteText) {
-                $inputField.val('');
-                var note = new NoteApp.NoteObject(noteText);
-                this.props.storage.post(note);
+                try {
+                    var note = new NoteApp.NoteObject(noteText);
+                    this.props.storage.post(note);
+                    $inputField.val('');
+                } catch (e) {
+                    // TODO: post to server, GTM?
+                    console.log(e.message);
+                    if (e instanceof StorageServerException) {
+                        // todo: notify user
+                    }
+                }
             }
         },
 
         edit: function (note, callback, editDomNode) {
             // refer to todoItem.js `handleEdit` for the reasoning behind the
             // callback
+            console.log(note);
             this.setState({editing: note.uuid}, function () {
-                this.initInputField(editDomNode);
+                this.initTextarea(editDomNode);
                 callback();
             });
         },
 
         save: function (note, text, callback) {
 
-            var noteObject = new NoteApp.NoteObject(text.trim());
-            var tags = [];
-            var tagInStorage;
-            for (var i = 0; i < noteObject.tags.length; i++) {
-                tagInStorage = this.props.storage.getTagByName(noteObject.tags[i].name);
-                if (tagInStorage) {
-                    tags.push(tagInStorage);
-                } else {
-                    tags.push(noteObject.tags[i]);
+            try {
+                var noteObject = new NoteApp.NoteObject(text);
+                noteObject.uuid = note.uuid;
+                this.props.storage.put(noteObject);
+                this.setState({editing: null});
+                callback();
+            } catch (e) {
+                // TODO: post to server, GTM?
+                console.log(e.message);
+                if (e instanceof StorageServerException) {
+                    // todo: notify user
                 }
             }
-            console.log(tags);
-            note.text = noteObject.text;
-            note.tags = tags;
-            this.props.storage.put(note);
-            this.setState({editing: null});
-            callback();
         },
 
         cancel: function () {
             this.setState({editing: null});
         },
 
-        destroy: function(note)
+        deleteNote: function(note)
         {
             // @todo check perms
             this.props.storage.delete(note.uuid);
@@ -113,21 +120,28 @@ var NoteApp = NoteApp || {};
         clickTag: function(tag)
         {
             event.preventDefault();
-            console.log(tag);
             if (tag.available) {
                 this.props.storage.toggleTagFilter(tag);
                 this.props.storage.serverPull();
             }
         },
 
+        pinTag: function(tag, callback)
+        {
+            if (tag.available) {
+                this.props.storage.toggleTagPinned(tag);
+                this.props.storage.serverPull();
+            }
+            callback();
+        },
+
         render: function () {
             var NoteComponent = NoteApp.Note;
             var notesHtml = this.props.storage.collection().map(function (note) {
-                //console.log(note);
                 return <NoteComponent
                     key={note.uuid}
                     note={note}
-                    onDestroy={this.destroy.bind(this, note)}
+                    onDestroy={this.deleteNote.bind(this, note)}
                     onEdit={this.edit.bind(this, note)}
                     onSave={this.save.bind(this, note)}
                     onCancel={this.cancel}
@@ -145,6 +159,7 @@ var NoteApp = NoteApp || {};
                     <TagComponent
                         tag={tag}
                         onClick={this.clickTag.bind(this, tag)}
+                        onPinTag={this.pinTag.bind(this, tag)}
                     />
                 );
             }, this);
@@ -157,7 +172,7 @@ var NoteApp = NoteApp || {};
                                 id="mainInput"
                                 ref="mainInput"
                                 className="materialize-textarea"
-                                onKeyDown={this.handleKeyboardSubmit}
+                                onKeyDown={this.handleHotKeySubmit}
                                 autoFocus={true}
                             />
                             <label htmlFor="mainInput">New Note</label>
@@ -170,7 +185,7 @@ var NoteApp = NoteApp || {};
                         </div>
                         <div className="col s2 fixed">
                             <div className="row">
-                            {tagsHtml.length > 0 ? <div className="collection">{tagsHtml}</div> : ''}
+                            {tagsHtml.length > 0 ? <div className="collection" id="tags-list">{tagsHtml}</div> : ''}
                             </div>
                         </div>
                     </div>

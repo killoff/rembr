@@ -24,7 +24,7 @@
 //@import "components/tabs";
 //@import "components/tooltip";
 @import "components/buttons";
-//@import "components/dropdown";
+@import "components/dropdown";
 @import "components/waves";
 @import "components/modal";
 @import "components/collapsible";
@@ -32,6 +32,8 @@
 @import "components/form";
 @import "components/table_of_contents";
 @import "components/sideNav";
+
+
 //@import "components/preloader";
 //@import "components/slider";
 //@import "components/date_picker/default.scss";
@@ -51,7 +53,7 @@
   border: 1px solid #e0e0e0;
   margin-right: 2px;
   @include box-sizing(border-box);
-  @include border-radius(7px);
+  border-radius: 7px;
 }
 .note-tags {
   margin-bottom: 20px;
@@ -67,6 +69,9 @@
     border-bottom-width: 1px;
     border-color: #9e9e9e;
   }
+}
+.pinned-note {
+  background-color: #fff59d;
 }
 
 #notes-list div.collection-item  {
@@ -151,7 +156,28 @@ a.action-delete {
 a.action-delete:hover {
   color: #ff8a65;
 }
+i.action-pin {
+  font-size: 1.25rem;
+  margin-right: 10px;
+  color: #ffeb3b;
+  cursor: hand;
+}
+.visible {
+  visibility: visible;
+}
+.invisible {
+  visibility: hidden;
+}
+#tags-list div:hover .action-pin {
+  visibility: visible;
+}
+#tags-list div.collection-item  {
+  padding: 10px 10px 10px 10px;
+}
 
+.cursor-hand {
+  cursor: hand;
+}
 #notes-list div:hover .action {
   display: block;
 }
@@ -160,3 +186,15 @@ a.icon-btn {
   padding: 0 1rem;
 }
 
+.tags-list {
+  position: fixed;
+  right: 70px;
+  top: 65px;
+  padding-top: 15px;
+  margin-bottom: 0;
+  z-index: 998;
+
+  //top: 15px;
+  //left: 15px;
+  //position: absolute;
+}

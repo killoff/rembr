@@ -1,64 +1,129 @@
 <?php
-class NoteController extends BaseController
+class NoteController extends Controller
 {
     const TAG_ENCLOSURE = ':';
     const INITIAL_LIMIT = 50;
 
     public function all()
     {
+        try {
 //    Auth::loginUsingId(5);
-        $userId = Auth::id();
-        $response = [
-            'notes' => [],
-            'tags' => []
-        ];
+            $userId = Auth::id();
+            $response = [
+                'notes' => [],
+                'tags' => []
+            ];
 
-        if (!Auth::check()) {
-            return json_encode($response);
-        }
-
-        $filters = json_decode(Input::get('filter'), true);
-        $searchStrings = $this->convertToSearchStrings($filters);
-        //print_r($searchStrings);
-        $filterNoteIds = [];
-        if (count($searchStrings) > 0) {
-            // create search string like '+"tag1" +"tag2" +"tag3"'
-            $searchString = '+"' . implode('" +"', $searchStrings) . '"';
-
-            $filterNoteIds = DB::table('search_index')
-                ->select('search_index.note_id')
-                ->join('note', 'search_index.note_id', '=', 'note.note_id')
-                ->where('note.user_id', $userId)
-                ->whereRaw('MATCH(search_index.text) AGAINST (? IN BOOLEAN MODE)', [$searchString])
-                ->lists('note_id');
-
-            // for searches that don't return any results
-            if (empty($filterNoteIds)) {
-                $filterNoteIds = [-1];
+            if (!Auth::check()) {
+                return json_encode($response);
             }
+
+            $filters = json_decode(Input::get('filter'), true);
+            $periods = Input::get('periods', []);
+
+            $pinnedTagUuids = isset($filters['pinned']) ? (array)$filters['pinned'] : [];
+            if (isset($filters['pinned'])) {
+                unset($filters['pinned']);
+            }
+            $pinnedTagUuids = array_merge($this->getPinnedTagUuids($userId), $pinnedTagUuids);
+            $pinnedTagUuids = array_unique($pinnedTagUuids);
+
+            $searchStrings = $this->convertToSearchStrings($filters);
+            //print_r($searchStrings);
+            $filterNoteIds = [];
+            if (count($searchStrings) > 0) {
+                // create search string like '+"tag1" +"tag2" +"tag3"'
+                $searchString = '+' . implode('* +', $searchStrings) . '*';
+
+                $filterNoteIds = DB::table('search_index')
+                    ->select('search_index.note_id')
+                    ->join('note', 'search_index.note_id', '=', 'note.note_id')
+                    ->where('note.user_id', $userId)
+                    ->whereRaw('MATCH(search_index.text) AGAINST (? IN BOOLEAN MODE)', [$searchString])
+                    ->lists('note_id');
+                $this->debug(DB::getQueryLog());
+
+                // for searches that don't return any results
+                if (empty($filterNoteIds)) {
+                    $filterNoteIds = [-1];
+                }
+            }
+
+            $notesSql = DB::table('note')
+                ->select(DB::raw("note.text, note.uuid, GROUP_CONCAT(tag.uuid,'\\n', tag.name SEPARATOR '\\n\\n') AS tags_grouped"))
+                ->leftJoin('note_tag', 'note.note_id', '=', 'note_tag.note_id')
+                ->leftJoin('tag', 'note_tag.tag_id', '=', 'tag.tag_id')
+                ->where('note.user_id', $userId)
+                ->groupBy('note.note_id')
+                ->orderBy('note.created_at', 'asc');
+
+            $notes = clone $notesSql;
+
+            if ($filterNoteIds) {
+                $notes->whereIn('note.note_id', $filterNoteIds);
+            }
+
+            $pinnedNotes = [];
+            $pinnedNoteIds = $this->getPinnedNoteIds($pinnedTagUuids, $userId);
+            if ($pinnedNoteIds) {
+                $pinnedNotes = clone $notesSql;
+                $pinnedNotes->whereIn('note.note_id', $pinnedNoteIds);
+
+                $notes->whereNotIn('note.note_id', $pinnedNoteIds);
+            }
+
+            $tags = DB::table('tag')
+                ->select('name', 'tag.uuid', 'tag.pinned', DB::raw('count(note_tag.note_id) as total'))
+                ->join('note_tag', function($join) use ($filterNoteIds)
+                {
+                    $join->on('note_tag.tag_id', '=', 'tag.tag_id');
+                    if (!empty($filterNoteIds)) {
+                        $join->on('note_tag.note_id', 'in', DB::raw('('.implode(',', $filterNoteIds).')')); // joins don't support whereIn()
+                    }
+                })
+                ->groupBy('tag.tag_id')
+                ->where('is_system', 0)
+                ->whereUserId($userId);
+
+            $allNotes = array_merge($pinnedNotes->get(), $notes->get());
+
+            foreach($allNotes as $noteObject) {
+                $noteObject->tags = [];
+                $noteTags = explode("\n\n", $noteObject->tags_grouped);
+                unset($noteObject->tags_grouped);
+                if (empty($noteTags)) {
+                    continue;
+                }
+                foreach ($noteTags as $noteTag) {
+                    $tagInfo = explode("\n", $noteTag);
+                    if (empty($tagInfo) || !is_array($tagInfo) || count($tagInfo) < 2) {
+                        continue;
+                    }
+                    $tagUuid = $tagInfo[0];
+                    $tagName = $tagInfo[1];
+                    if ($tagUuid && $tagName) {
+                        $noteObject->tags[] = ['uuid' => $tagUuid, 'name' => $tagName];
+                    }
+                }
+            }
+
+            $response['notes'] = $allNotes;
+            $response['tags'] = $tags->get();
+            $response['filter_note_ids'] = $filterNoteIds;
+            $response['debug'] = $this->_debug;
+            if (!empty($periods)) {
+                $response['periods'] = DB::table('tag')
+                    ->select('uuid')
+                    ->where('user_id', $userId)
+                    ->whereIn('uuid', $periods)
+                    ->lists('uuid');
+            }
+
+            return json_encode($response);
+
+        } catch (Exception $e) {
+            return $e->getTraceAsString();
         }
-
-        $notes = DB::table('note')
-            ->select(DB::raw('note.note_id AS id, note.text, note.uuid, GROUP_CONCAT(note_tag.tag_id) AS tag_ids'))
-            ->leftJoin('note_tag', 'note.note_id', '=', 'note_tag.note_id')
-            ->where('note.user_id', $userId)
-            ->groupBy('note.note_id')
-            ->orderBy('note.created_at', 'desc');
-
-        if ($filterNoteIds) {
-            $notes->whereIn('note.note_id', $filterNoteIds);
-        }
-
-        $tags = DB::table('tag')
-            ->select('tag.tag_id as id', 'name', 'tag.uuid', DB::raw('count(*) as total'))
-            ->join('note_tag', 'note_tag.tag_id', '=', 'tag.tag_id')
-            ->groupBy('tag.tag_id')
-            ->whereUserId($userId);
-
-        $response['notes'] = $notes->get();
-        $response['tags'] = $tags->get();
-
-        return json_encode($response);
     }
 
     private function convertToSearchStrings($filters)
@@ -73,7 +138,47 @@ class NoteController extends BaseController
             }
             $result = array_merge($result, $values);
         }
-        return array_unique($result);
+        $result = array_unique($result);
+
+        // avoid empty values
+        return array_filter(
+            $result,
+            function($value) {
+                return !empty(trim($value));
+            }
+        );
+    }
+
+    private function getPinnedNoteIds($tagUuids, $userId)
+    {
+        $pinnedNoteIds = [];
+        if (count($tagUuids) > 0) {
+            // create search string like '"tag1" "tag2" "tag3"' => notes with at least one pinned tag
+            $searchString = ' "' . implode('" "', $tagUuids) . '"';
+
+            $pinnedNoteIds = DB::table('search_index')
+                ->select('search_index.note_id')
+                ->join('note', 'search_index.note_id', '=', 'note.note_id')
+                ->where('note.user_id', $userId)
+                ->whereRaw('MATCH(search_index.text) AGAINST (? IN BOOLEAN MODE)', [$searchString])
+                ->lists('note_id');
+
+            // for searches that don't return any results
+            if (empty($pinnedNoteIds)) {
+                $pinnedNoteIds = [-1];
+            }
+        }
+        return $pinnedNoteIds;
+    }
+
+    private function getPinnedTagUuids($userId)
+    {
+        $pinnedTagUuids = DB::table('tag')
+            ->select('uuid')
+            ->where('user_id', $userId)
+            ->where('pinned', 1)
+            ->lists('uuid');
+        return $pinnedTagUuids;
     }
 
     public function save()
@@ -84,45 +189,52 @@ class NoteController extends BaseController
                 throw new \LogicException('Authorization failed.');
             }
 
-            $note = json_decode(Request::instance()->getContent());
+            $notes = json_decode(Request::instance()->getContent());
 
-            if (! $note instanceof \stdClass) {
-                throw new \DomainException('note must be an object.');
+            if (!is_array($notes)) {
+                throw new \DomainException('notes must be a collection.');
             }
-            if (empty($note->uuid)) {
-                throw new \DomainException('note.uuid not found, unable to save.');
-            }
-            if (empty($note->text) && empty($note->tags)) {
-                throw new \DomainException('note.text and note.tags are empty, unable to save.');
-            }
+            foreach ($notes as $note) {
+                if (! $note instanceof \stdClass) {
+                    throw new \DomainException('note must be an object.');
+                }
+                if (empty($note->uuid)) {
+                    throw new \DomainException('note.uuid not found, unable to save.');
+                }
+                if (empty($note->text) && empty($note->tags)) {
+                    throw new \DomainException('note.text and note.tags are empty, unable to save.');
+                }
 
-            $now = date('Y-m-d H:i:s', time());
+                $now = date('Y-m-d H:i:s', time());
 
-            $existing = DB::table('note')->whereUuid($note->uuid)->whereUserId(Auth::id())->first();
+                $existing = DB::table('note')->whereUuid($note->uuid)->whereUserId(Auth::id())->first();
 
-            if ($existing === null) {
-                $noteId = DB::table('note')->insertGetId(
-                    array(
-                        'user_id' => Auth::id(),
-                        'text' => $note->text,
-                        'uuid' => $note->uuid,
-                        'created_at' => $now,
-                        'updated_at' => $now
-                    )
-                );
-            } else {
-                $noteId = $existing->note_id;
-                DB::table('note')->whereNoteId($noteId)
-                    ->update(['text' => $note->text, 'updated_at' => $now]);
-            }
+                if ($existing === null) {
+                    $noteId = DB::table('note')->insertGetId(
+                        array(
+                            'user_id' => Auth::id(),
+                            'text' => $note->text,
+                            'uuid' => $note->uuid,
+                            'created_at' => $now,
+                            'updated_at' => $now
+                        )
+                    );
+                } else {
+                    $noteId = $existing->note_id;
+                    DB::table('note')->whereNoteId($noteId)
+                        ->update(['text' => $note->text, 'updated_at' => $now]);
+                }
 
-            if ($noteId) {
-                $this->saveTags($noteId, $note->tags);
-                $this->updateSearchIndex($noteId);
-                $response = array('uuid' => $note->uuid);
-                return json_encode($response);
-            } else {
-                throw new \Exception('note.id not generated, unable to save.');
+                if ($noteId) {
+                    $this->saveTags($noteId, $note->tags);
+                    $this->saveDates($noteId, $note->moments);
+                    $this->updateSearchIndex($noteId);
+                    $response = array('uuid' => $note->uuid);
+                    $response['debug'] = $this->_debug;
+                    return json_encode($response);
+                } else {
+                    throw new \Exception('note.id not generated, unable to save.');
+                }
             }
 
         } catch (\Exception $e) {
@@ -145,6 +257,13 @@ class NoteController extends BaseController
         }
     }
 
+    private $_debug = [];
+    private function debug($data)
+    {
+        $data = is_array($data) ? $data : [$data];
+        $this->_debug = array_merge($this->_debug, $data);
+    }
+
     protected function saveTags($noteId, $tags)
     {
         $noteTagIds = DB::table('note_tag')->whereNoteId($noteId)->lists('tag_id');
@@ -152,16 +271,25 @@ class NoteController extends BaseController
         foreach ($tags as $tag) {
             $tagId = DB::table('tag')
                 ->whereUserId(Auth::id())
-                ->whereName($tag->name)
+                ->whereUuid($tag->uuid)
                 ->pluck('tag_id');
+            if (!$tagId) {
+                $this->debug('tag not found by uuid: '.$tag->uuid);
+                $tagId = DB::table('tag')
+                    ->whereUserId(Auth::id())
+                    ->whereName($tag->name)
+                    ->pluck('tag_id');
+            }
             if (!$tagId) {
                 $tagId = DB::table('tag')->insertGetId(
                     [
                         'user_id' => Auth::id(),
                         'name' => $tag->name,
-                        'uuid' => $tag->uuid ? $tag->uuid : $this->generateUuid()
+                        'uuid' => $tag->uuid ? $tag->uuid : $this->generateUuid(),
+                        'is_system' => isset($tag->system) ? $tag->system : 0
                     ]
                 );
+                $this->debug('new tag inserted: '.$tagId);
             }
             $newTagIds[] = $tagId;
         }
@@ -171,12 +299,13 @@ class NoteController extends BaseController
 
         $tagIdsToDelete = array_diff($noteTagIds, $newTagIds);
         if (count($tagIdsToDelete) > 0) {
+            $this->debug('tagIdsToDelete: '.implode(',', $tagIdsToDelete));
             DB::table('note_tag')->whereIn('tag_id', $tagIdsToDelete)->delete();
         }
 
         $tagIdsToInsert = array_diff($newTagIds, $noteTagIds);
         if (count($tagIdsToInsert) > 0) {
-            //$this->debug($tagIdsToInsert, 'tagIdsToInsert');
+            $this->debug('tagIdsToInsert: '.implode(',', $tagIdsToInsert));
             $insertData = [];
             foreach ($tagIdsToInsert as $tagId) {
                 $insertData[] =  array('note_id' => $noteId, 'tag_id' => $tagId);
@@ -186,6 +315,26 @@ class NoteController extends BaseController
         }
 
         return $newTagIds;
+    }
+
+    private function saveDates($noteId, $moments)
+    {
+        if (!is_array($moments)) {
+            return false;
+        }
+        DB::table('note_dates')->whereNoteId($noteId)->delete();
+
+        foreach ($moments as $moment) {
+            $momentDateTime = new DateTime();
+            $momentDateTime->setDate($moment->year, $moment->month, $moment->day);
+            $momentDateTime->setTime($moment->hour, $moment->minute, 0);
+            DB::table('note_dates')->insert(
+                array(
+                    'note_id' => $noteId,
+                    'moment' => $momentDateTime->format('Y-m-d H:i:s')
+                )
+            );
+        }
     }
 
     private function updateSearchIndex($noteId)
@@ -205,6 +354,27 @@ class NoteController extends BaseController
                 ['note_id' => $noteId]
             );
         });
+    }
+
+    public function pinTag()
+    {
+        // todo: validation code is duplicated
+        if (!Auth::check()) {
+            throw new \LogicException('Authorization failed.');
+        }
+
+        $tag = json_decode(Request::instance()->getContent());
+
+        if (! $tag instanceof \stdClass) {
+            throw new \DomainException('tag must be an object.');
+        }
+        if (empty($tag->uuid)) {
+            throw new \DomainException('tag.uuid not found, unable to pin.');
+        }
+        $pinned = $tag->pinned ? 1 : 0;
+        DB::table('tag')->whereUuid($tag->uuid)
+            ->whereUserId(Auth::id())
+            ->update(['pinned' => $pinned]);
     }
 
     private function generateUuid()
@@ -238,8 +408,9 @@ DB::connection()->enableQueryLog();
 $userId=1;
 
         $notes = DB::table('note')
-            ->select(DB::raw('note.note_id AS id, note.text, note.uuid, GROUP_CONCAT(note_tag.tag_id) AS tag_ids'))
+            ->select(DB::raw('note.note_id AS id, note.text, note.uuid, GROUP_CONCAT(tag.uuid) AS tag_uuids'))
             ->leftJoin('note_tag', 'note.note_id', '=', 'note_tag.note_id')
+            ->leftJoin('tag', 'note_tag.tag_id', '=', 'tag.tag_id')
             ->where('note.user_id', $userId)
             ->groupBy('note.note_id')
             ->orderBy('note.updated_at', 'desc');
@@ -337,7 +508,18 @@ return;
 
     }
 
-    private function debug($data, $key = '')
+    public function refreshIndex()
+    {
+         $noteIds = DB::table('note')
+             ->select('note_id')
+             ->orderBy('note_id')
+             ->lists('note_id');
+         foreach ($noteIds as $noteId) {
+            $this->updateSearchIndex($noteId);
+         }
+   }
+
+    private function debug_file($data, $key = '')
     {
         $log = "\n\n[".date('d.m.Y H:i:s').'] ' . $key . ': ';
         $log .= is_string($data) ? $data : "\n".print_r($data,1);

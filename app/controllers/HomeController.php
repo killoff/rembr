@@ -1,6 +1,6 @@
 <?php
 
-class HomeController extends BaseController
+class HomeController extends Controller
 {
     public function splash()
     {
@@ -9,15 +9,7 @@ class HomeController extends BaseController
                 'user' => Auth::getUser()
             ));
         } else {
-            return View::make('login');
+            return View::make('landing');
         }
     }
-
-    public function login()
-    {
-        //Auth::attempt(array('email' => 'killoff@gmail.com'), true);
-        //Redirect::to('/');
-    }
-
-
 }
