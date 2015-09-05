@@ -3173,11 +3173,12 @@ exports.parseDate = function () {
     return exports.casual.parseDate.apply(exports.casual, arguments);
 }
 
-},{"./options":3,"./parsers/parser":13,"./refiners/refiner":20,"./result":21}],3:[function(require,module,exports){
+},{"./options":3,"./parsers/parser":14,"./refiners/refiner":21,"./result":22}],3:[function(require,module,exports){
 var ENISOFormatParser = require('./parsers/EN/ENISOFormatParser').Parser;
+var ENDeadlineFormatParser = require('./parsers/EN/ENDeadlineFormatParser').Parser;
 var ENMonthNameLittleEndianParser = require('./parsers/EN/ENMonthNameLittleEndianParser').Parser;
 var ENMonthNameMiddleEndianParser = require('./parsers/EN/ENMonthNameMiddleEndianParser').Parser;
-//var ENSlashDateFormatParser = require('./parsers/EN/ENSlashDateFormatParser').Parser;
+var ENSlashDateFormatParser = require('./parsers/EN/ENSlashDateFormatParser').Parser;
 var ENTimeAgoFormatParser = require('./parsers/EN/ENTimeAgoFormatParser').Parser;
 var ENTimeExpessionParser = require('./parsers/EN/ENTimeExpressionParser').Parser;
 var ENWeekdayParser = require('./parsers/EN/ENWeekdayParser').Parser;
@@ -3187,7 +3188,6 @@ var ENMergeDateTimeRefiner = require('./refiners/EN/ENMergeDateTimeRefiner').Ref
 var ENMergeDateRangeRefiner = require('./refiners/EN/ENMergeDateRangeRefiner').Refiner;
 
 var RUWeekdayParser = require('./parsers/RU/RUWeekdayParser').Parser;
-var RUSlashDotDateFormatParser = require('./parsers/RU/RUSlashDotDateFormatParser').Parser;
 
 var OverlapRemovalRefiner = require('./refiners/OverlapRemovalRefiner').Refiner;
 var ExtractTimezoneOffsetRefiner = require('./refiners/ExtractTimezoneOffsetRefiner').Refiner;
@@ -3202,10 +3202,10 @@ exports.strictOption = function () {
         
             // EN
         	new ENISOFormatParser(),
-            //new ENDeadlineFormatParser(),
+            new ENDeadlineFormatParser(),
             new ENMonthNameLittleEndianParser(),
             new ENMonthNameMiddleEndianParser(),
-            //new ENSlashDateFormatParser(),
+            new ENSlashDateFormatParser(),
             new ENTimeAgoFormatParser(),           
             new ENTimeExpessionParser(),
         ],
@@ -3234,12 +3234,11 @@ exports.casualOption = function () {
     options.parsers.unshift(new ENCasualDateParser());
     options.parsers.unshift(new ENWeekdayParser());
     options.parsers.unshift(new RUWeekdayParser());
-    options.parsers.unshift(new RUSlashDotDateFormatParser());
 
     return options;
 };
 
-},{"./parsers/EN/ENCasualDateParser":4,"./parsers/EN/ENISOFormatParser":5,"./parsers/EN/ENMonthNameLittleEndianParser":6,"./parsers/EN/ENMonthNameMiddleEndianParser":7,"./parsers/EN/ENTimeAgoFormatParser":8,"./parsers/EN/ENTimeExpressionParser":9,"./parsers/EN/ENWeekdayParser":10,"./parsers/RU/RUSlashDotDateFormatParser":11,"./parsers/RU/RUWeekdayParser":12,"./refiners/EN/ENMergeDateRangeRefiner":14,"./refiners/EN/ENMergeDateTimeRefiner":15,"./refiners/ExtractTimezoneAbbrRefiner":16,"./refiners/ExtractTimezoneOffsetRefiner":17,"./refiners/OverlapRemovalRefiner":18,"./refiners/UnlikelyFormatFilter":19}],4:[function(require,module,exports){
+},{"./parsers/EN/ENCasualDateParser":4,"./parsers/EN/ENDeadlineFormatParser":5,"./parsers/EN/ENISOFormatParser":6,"./parsers/EN/ENMonthNameLittleEndianParser":7,"./parsers/EN/ENMonthNameMiddleEndianParser":8,"./parsers/EN/ENSlashDateFormatParser":9,"./parsers/EN/ENTimeAgoFormatParser":10,"./parsers/EN/ENTimeExpressionParser":11,"./parsers/EN/ENWeekdayParser":12,"./parsers/RU/RUWeekdayParser":13,"./refiners/EN/ENMergeDateRangeRefiner":15,"./refiners/EN/ENMergeDateTimeRefiner":16,"./refiners/ExtractTimezoneAbbrRefiner":17,"./refiners/ExtractTimezoneOffsetRefiner":18,"./refiners/OverlapRemovalRefiner":19,"./refiners/UnlikelyFormatFilter":20}],4:[function(require,module,exports){
 /*
     
     
@@ -3320,7 +3319,70 @@ exports.Parser = function ENCasualDateParser(){
 }
 
 
-},{"../../result":21,"../parser":13,"moment":1}],5:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],5:[function(require,module,exports){
+/*
+
+
+*/
+
+var moment = require('moment');
+var Parser = require('../parser').Parser;
+var ParsedResult = require('../../result').ParsedResult;
+
+var PATTERN = /(\W|^)(within|in)\s*([0-9]+)\s*(minutes?|hours?|days?)\s*(?=(?:\W|$))/i;
+
+exports.Parser = function ENDeadlineFormatParser(){
+    Parser.call(this);
+    
+    this.pattern = function() { return PATTERN; }
+
+    this.extract = function(text, ref, match, opt){
+
+        var index = match.index + match[1].length;
+        var text  = match[0];
+        text  = match[0].substr(match[1].length, match[0].length - match[1].length);
+
+        var result = new ParsedResult({
+            index: index,
+            text: text,
+            ref: ref,
+        });
+
+        var num = match[3];
+        num = parseInt(num);
+
+        var date = moment(ref);
+        if (match[4].match(/day/)) {
+            date.add(num, 'd');
+
+            result.start.assign('year', date.year());
+            result.start.assign('month', date.month() + 1);
+            result.start.assign('day', date.date());
+            return result;
+        }
+
+
+        if (match[4].match(/hour/)) {
+
+            date.add(num, 'hour');
+
+        } else if (match[4].match(/minute/)) {
+
+            date.add(num, 'minute');
+        }
+
+        result.start.imply('year', date.year());
+        result.start.imply('month', date.month() + 1);
+        result.start.imply('day', date.date());
+        result.start.assign('hour', date.hour());
+        result.start.assign('minute', date.minute());
+        result.tags['ENDeadlineFormatParser'] = true;
+        return result;
+    };
+}
+
+
+},{"../../result":22,"../parser":14,"moment":1}],6:[function(require,module,exports){
 /*
     ISO 8601
     http://www.w3.org/TR/NOTE-datetime
@@ -3425,7 +3487,7 @@ exports.Parser = function ENISOFormatParser(){
 }
 
 
-},{"../../result":21,"../parser":13,"moment":1}],6:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],7:[function(require,module,exports){
 /*
     
     
@@ -3540,7 +3602,7 @@ exports.Parser = function ENMonthNameLittleEndianParser(){
 }
 
 
-},{"../../result":21,"../../utils/EN":22,"../parser":13,"moment":1}],7:[function(require,module,exports){
+},{"../../result":22,"../../utils/EN":23,"../parser":14,"moment":1}],8:[function(require,module,exports){
 /*
     
     The parser for parsing US's date format that begin with month's name.
@@ -3674,7 +3736,86 @@ exports.Parser = function ENMonthNameMiddleEndianParser(){
 }
 
 
-},{"../../result":21,"../parser":13,"moment":1}],8:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],9:[function(require,module,exports){
+/*
+    
+    
+*/
+
+var moment = require('moment');
+var Parser = require('../parser').Parser;
+var ParsedResult = require('../../result').ParsedResult;
+
+var PATTERN = /(\W|^)(Sun|Sunday|Mon|Monday|Tue|Tuesday|Wed|Wednesday|Thur|Thursday|Fri|Friday|Sat|Saturday)?\s*\,?\s*([0-9]{1,2})[\/\.]([0-9]{1,2})([\/\.]([0-9]{4}|[0-9]{2}))?(\W|$)/i;
+var DAYS_OFFSET = { 'sunday': 0, 'sun': 0, 'monday': 1, 'mon': 1,'tuesday': 2, 'wednesday': 3, 'wed': 3,
+    'thursday': 4, 'thur': 4,'friday': 5, 'fri': 5,'saturday': 6, 'sat': 6,}
+  
+exports.Parser = function ENSlashDateFormatParser(argument) {
+    Parser.call(this);
+
+    this.pattern = function () { return PATTERN; };
+    this.extract = function(text, ref, match, opt){
+        
+        if(match[1] == '/' || match[7] == '/') return;
+
+        var index = match.index + match[1].length;
+        var text = match[0].substr(match[1].length, match[0].length - match[7].length);
+        var result = new ParsedResult({
+            text: text,
+            index: index,
+            ref: ref,
+        });
+            
+        if(text.match(/^\d.\d$/)) return;
+
+        
+        // MM/dd -> OK
+        // MM.dd -> NG
+        if(!match[6] && match[0].indexOf('/') < 0) return;
+
+        var date = null;
+        var year = match[6] || moment(ref).year() + '';
+        var month = match[3];
+        var day   = match[4];
+        
+        
+        
+        month = parseInt(month);
+        day  = parseInt(day);
+        year = parseInt(year);
+        if(month < 1 || month > 12) return null;
+        if(day < 1 || day > 31) return null;
+
+        if(year < 100){
+            if(year > 50){
+                year = year + 2500 - 543; //BE
+            }else{
+                year = year + 2000; //AD
+            }
+        }
+        
+        text = month+'/'+day+'/'+year
+        date = moment(text,'M/D/YYYY');
+        if(!date || date.date() != day || date.month() != (month-1)) {
+            return null;
+        }
+        
+
+        result.start.assign('day', date.date());
+        result.start.assign('month', date.month() + 1);
+        result.start.assign('year', date.year());
+
+        //Day of week
+        if(match[2]) {
+            result.start.assign('weekday', DAYS_OFFSET[match[2].toLowerCase()]);
+        }
+
+        result.tags['ENSlashDateFormatParser'] = true;
+        return result;
+    };
+};
+
+},{"../../result":22,"../parser":14,"moment":1}],10:[function(require,module,exports){
 /*
 
 
@@ -3740,7 +3881,7 @@ exports.Parser = function ENTimeAgoFormatParser(){
     };
 }
 
-},{"../../result":21,"../parser":13,"moment":1}],9:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],11:[function(require,module,exports){
 /*
 
 
@@ -3974,7 +4115,7 @@ exports.Parser = function ENTimeExpressionParser(){
 }
 
 
-},{"../../result":21,"../parser":13,"moment":1}],10:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],12:[function(require,module,exports){
 /*
     
     
@@ -4052,94 +4193,7 @@ exports.Parser = function ENWeekdayParser() {
 }
 
 
-},{"../../result":21,"../parser":13,"moment":1}],11:[function(require,module,exports){
-/*
-    
-    
-*/
-
-var moment = require('moment');
-var Parser = require('../parser').Parser;
-var ParsedResult = require('../../result').ParsedResult;
-
-var PATTERN = /(\W|^)(Sun|Sunday|Mon|Monday|Tue|Tuesday|Wed|Wednesday|Thur|Thursday|Fri|Friday|Sat|Saturday)?\s*\,?\s*([0-9]{1,2})[\/\.]([0-9]{1,2})([\/\.]([0-9]{4}|[0-9]{2}))?(\W|$)/i;
-var DAYS_OFFSET = { 'sunday': 0, 'sun': 0, 'monday': 1, 'mon': 1,'tuesday': 2, 'wednesday': 3, 'wed': 3,
-    'thursday': 4, 'thur': 4,'friday': 5, 'fri': 5,'saturday': 6, 'sat': 6,}
-  
-exports.Parser = function RUSlashDotDateFormatParser(argument) {
-    Parser.call(this);
-
-    this.pattern = function () { return PATTERN; };
-    this.extract = function(text, ref, match, opt){
-        //console.log('ru:');
-        //console.log(match[0]);
-        //console.log(match[1]);
-        //console.log(match[2]);
-        //console.log(match[3]);
-        //console.log(match[4]);
-        //console.log(match[5]);
-        //console.log(match[6]);
-        //console.log(match[7]);
-        //console.log(match[0]);
-        if(match[1] == '/' || match[7] == '/') return;
-        var index = match.index + match[1].length;
-        var text = match[0].substr(match[1].length, match[0].length - match[7].length);
-        var result = new ParsedResult({
-            text: text,
-            index: index,
-            ref: ref,
-        });
-            
-        //if(text.match(/^\d.\d$/)) return;
-
-        
-        // MM/dd -> OK
-        // MM.dd -> NG
-        if(!match[6] && match[0].indexOf('/') < 0) return;
-
-        var date = null;
-        var year = match[6] || moment(ref).year() + '';
-        var month = match[3];
-        var day   = match[4];
-        
-        
-        
-        month = parseInt(month);
-        day  = parseInt(day);
-        year = parseInt(year);
-        if(month < 1 || month > 12) return null;
-        if(day < 1 || day > 31) return null;
-
-        if(year < 100){
-            if(year > 50){
-                year = year + 2500 - 543; //BE
-            }else{
-                year = year + 2000; //AD
-            }
-        }
-        
-        text = month+'/'+day+'/'+year
-        date = moment(text,'M/D/YYYY');
-        if(!date || date.date() != day || date.month() != (month-1)) {
-            return null;
-        }
-        
-
-        result.start.assign('day', date.date());
-        result.start.assign('month', date.month() + 1);
-        result.start.assign('year', date.year());
-
-        //Day of week
-        if(match[2]) {
-            result.start.assign('weekday', DAYS_OFFSET[match[2].toLowerCase()]);
-        }
-
-        result.tags['ENSlashDateFormatParser'] = true;
-        return result;
-    };
-};
-
-},{"../../result":21,"../parser":13,"moment":1}],12:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],13:[function(require,module,exports){
 /*
     
     
@@ -4155,20 +4209,20 @@ var PATTERN = new RegExp('(\\W|^)' +
     '(?:\\s*(?:\\,|\\)|\\）))?' + 
     '(?:\\s*(this|last|next)\\s*week)?' + 
     '(?=\\W|$)', 'i');
-var DAYS_OFFSET = { 'воскресенье': 0, 'вс': 0, 'понедельник': 1, 'пн': 1,'вторник': 2, 'вт':2, 'вт':2, 'среда': 3, 'ср': 3,
-    'четверг': 4, 'чт':4, 'чт': 4, 'чт': 4,'пятница': 5, 'пт': 5,'суббота': 6, 'сб': 6,}
+var DAYS_OFFSET = { 'sunday': 0, 'sun': 0, 'monday': 1, 'mon': 1,'tuesday': 2, 'tues':2, 'tue':2, 'wednesday': 3, 'wed': 3,
+    'thursday': 4, 'thurs':4, 'thur': 4, 'thu': 4,'friday': 5, 'fri': 5,'saturday': 6, 'sat': 6,}
 
 var PREFIX_GROUP = 2;
 var WEEKDAY_GROUP = 3;
 var POSTFIX_GROUP = 4;
 
-exports.Parser = function RUWeekdayParser() {
+exports.Parser = function ENWeekdayParser() {
     Parser.call(this);
 
     this.pattern = function() { return PATTERN; }
     
     this.extract = function(text, ref, match, opt){ 
-        console.log(match);
+        
         var index = match.index + match[1].length;
         var text = match[0].substr(match[1].length, match[0].length - match[1].length);
         var result = new ParsedResult({
@@ -4216,7 +4270,7 @@ exports.Parser = function RUWeekdayParser() {
 }
 
 
-},{"../../result":21,"../parser":13,"moment":1}],13:[function(require,module,exports){
+},{"../../result":22,"../parser":14,"moment":1}],14:[function(require,module,exports){
 
 function Parser() {
 
@@ -4262,7 +4316,7 @@ function Parser() {
 
 exports.Parser = Parser;
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 /*
   
 */
@@ -4355,7 +4409,7 @@ exports.Refiner = function ENMergeDateRangeRefiner() {
 }
 
 
-},{"../refiner":20}],15:[function(require,module,exports){
+},{"../refiner":21}],16:[function(require,module,exports){
 /*
     
 */
@@ -4479,7 +4533,7 @@ exports.Refiner = function ENMergeDateTimeRefiner() {
         return mergedResult;
     }
 }
-},{"../../result":21,"../refiner":20}],16:[function(require,module,exports){
+},{"../../result":22,"../refiner":21}],17:[function(require,module,exports){
 /*
   
 */
@@ -4525,7 +4579,7 @@ exports.Refiner = function ExtractTimezoneAbbrRefiner() {
 
 // TODO: Move this to some configuration
 TIMEZONE_ABBR_MAP = {"A":60,"ACDT":630,"ACST":570,"ADT":-180,"AEDT":660,"AEST":600,"AFT":270,"AKDT":-480,"AKST":-540,"ALMT":360,"AMST":-180,"AMT":-240,"ANAST":720,"ANAT":720,"AQTT":300,"ART":-180,"AST":-240,"AWDT":540,"AWST":480,"AZOST":0,"AZOT":-60,"AZST":300,"AZT":240,"B":120,"BNT":480,"BOT":-240,"BRST":-120,"BRT":-180,"BST":60,"BTT":360,"C":180,"CAST":480,"CAT":120,"CCT":390,"CDT":-300,"CEST":120,"CET":60,"CHADT":825,"CHAST":765,"CKT":-600,"CLST":-180,"CLT":-240,"COT":-300,"CST":-360,"CVT":-60,"CXT":420,"ChST":600,"D":240,"DAVT":420,"E":300,"EASST":-300,"EAST":-360,"EAT":180,"ECT":-300,"EDT":-240,"EEST":180,"EET":120,"EGST":0,"EGT":-60,"EST":-300,"ET":-300,"F":360,"FJST":780,"FJT":720,"FKST":-180,"FKT":-240,"FNT":-120,"G":420,"GALT":-360,"GAMT":-540,"GET":240,"GFT":-180,"GILT":720,"GMT":0,"GST":240,"GYT":-240,"H":480,"HAA":-180,"HAC":-300,"HADT":-540,"HAE":-240,"HAP":-420,"HAR":-360,"HAST":-600,"HAT":-90,"HAY":-480,"HKT":480,"HLV":-210,"HNA":-240,"HNC":-360,"HNE":-300,"HNP":-480,"HNR":-420,"HNT":-150,"HNY":-540,"HOVT":420,"I":540,"ICT":420,"IDT":180,"IOT":360,"IRDT":270,"IRKST":540,"IRKT":540,"IRST":210,"IST":60,"JST":540,"K":600,"KGT":360,"KRAST":480,"KRAT":480,"KST":540,"KUYT":240,"L":660,"LHDT":660,"LHST":630,"LINT":840,"M":720,"MAGST":720,"MAGT":720,"MART":-510,"MAWT":300,"MDT":-360,"MESZ":120,"MEZ":60,"MHT":720,"MMT":390,"MSD":240,"MSK":240,"MST":-420,"MUT":240,"MVT":300,"MYT":480,"N":-60,"NCT":660,"NDT":-90,"NFT":690,"NOVST":420,"NOVT":360,"NPT":345,"NST":-150,"NUT":-660,"NZDT":780,"NZST":720,"O":-120,"OMSST":420,"OMST":420,"P":-180,"PDT":-420,"PET":-300,"PETST":720,"PETT":720,"PGT":600,"PHOT":780,"PHT":480,"PKT":300,"PMDT":-120,"PMST":-180,"PONT":660,"PST":-480,"PT":-480,"PWT":540,"PYST":-180,"PYT":-240,"Q":-240,"R":-300,"RET":240,"S":-360,"SAMT":240,"SAST":120,"SBT":660,"SCT":240,"SGT":480,"SRT":-180,"SST":-660,"T":-420,"TAHT":-600,"TFT":300,"TJT":300,"TKT":780,"TLT":540,"TMT":300,"TVT":720,"U":-480,"ULAT":480,"UTC":0,"UYST":-120,"UYT":-180,"UZT":300,"V":-540,"VET":-210,"VLAST":660,"VLAT":660,"VUT":660,"W":-600,"WAST":120,"WAT":60,"WEST":60,"WESZ":60,"WET":0,"WEZ":0,"WFT":720,"WGST":-120,"WGT":-180,"WIB":420,"WIT":540,"WITA":480,"WST":780,"WT":0,"X":-660,"Y":-720,"YAKST":600,"YAKT":600,"YAPT":600,"YEKST":360,"YEKT":360,"Z":0}
-},{"./refiner":20}],17:[function(require,module,exports){
+},{"./refiner":21}],18:[function(require,module,exports){
 /*
   
 */
@@ -4573,7 +4627,7 @@ exports.Refiner = function ExtractTimezoneOffsetRefiner() {
     }
 }
 
-},{"./refiner":20}],18:[function(require,module,exports){
+},{"./refiner":21}],19:[function(require,module,exports){
 /*
   
 */
@@ -4615,7 +4669,7 @@ exports.Refiner = function OverlapRemovalRefiner() {
         return filteredResults;
     }
 }
-},{"./refiner":20}],19:[function(require,module,exports){
+},{"./refiner":21}],20:[function(require,module,exports){
 /*
   
 */
@@ -4634,7 +4688,7 @@ exports.Refiner = function UnlikelyFormatFilter() {
         return true; 
     }
 }
-},{"./refiner":20}],20:[function(require,module,exports){
+},{"./refiner":21}],21:[function(require,module,exports){
 /*
                                   
   
@@ -4663,7 +4717,7 @@ exports.Filter = function Filter() {
         return filteredResult;
     }
 }
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 var moment = require('moment');
 
 function ParsedResult(result){
@@ -4765,7 +4819,7 @@ ParsedComponents.prototype.date = function() {
 exports.ParsedComponents = ParsedComponents;
 exports.ParsedResult = ParsedResult;
 
-},{"moment":1}],22:[function(require,module,exports){
+},{"moment":1}],23:[function(require,module,exports){
 exports.WEEKDAY_OFFSET = { 
     'sunday': 0, 
     'sun': 0, 

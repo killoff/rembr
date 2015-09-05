@@ -1,10 +1,10 @@
 
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 (function () {
     'use strict';
 
-    RembrServiceContainer.Config = function ()
+    RembrContainer.Config = function ()
     {
         this.data = {
             tag_prefix: '!'

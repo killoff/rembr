@@ -63,14 +63,14 @@ class NoteController extends Controller
                 $notes->whereIn('note.note_id', $filterNoteIds);
             }
 
-            $pinnedNotes = [];
-            $pinnedNoteIds = $this->getPinnedNoteIds($pinnedTagUuids, $userId);
-            if ($pinnedNoteIds) {
-                $pinnedNotes = clone $notesSql;
-                $pinnedNotes->whereIn('note.note_id', $pinnedNoteIds);
-
-                $notes->whereNotIn('note.note_id', $pinnedNoteIds);
-            }
+//            $pinnedNotes = [];
+//            $pinnedNoteIds = $this->getPinnedNoteIds($pinnedTagUuids, $userId);
+//            if ($pinnedNoteIds) {
+//                $pinnedNotes = clone $notesSql;
+//                $pinnedNotes->whereIn('note.note_id', $pinnedNoteIds);
+//
+//                $notes->whereNotIn('note.note_id', $pinnedNoteIds);
+//            }
 
             $tags = DB::table('tag')
                 ->select('name', 'tag.uuid', 'tag.pinned', DB::raw('count(note_tag.note_id) as total'))
@@ -82,10 +82,10 @@ class NoteController extends Controller
                     }
                 })
                 ->groupBy('tag.tag_id')
-                ->where('is_system', 0)
+                ->where('system', 0)
                 ->whereUserId($userId);
 
-            $allNotes = array_merge($pinnedNotes->get(), $notes->get());
+            $allNotes = $notes->get(); //array_merge($pinnedNotes->get(), $notes->get());
 
             foreach($allNotes as $noteObject) {
                 $noteObject->tags = [];
@@ -226,8 +226,12 @@ class NoteController extends Controller
                 }
 
                 if ($noteId) {
-                    $this->saveTags($noteId, $note->tags);
-                    $this->saveDates($noteId, $note->moments);
+                    if (!empty($note->tags)) {
+                        $this->saveTags($noteId, $note->tags);
+                    }
+                    if (!empty($note->moments)) {
+                        $this->saveDates($noteId, $note->moments);
+                    }
                     $this->updateSearchIndex($noteId);
                     $response = array('uuid' => $note->uuid);
                     $response['debug'] = $this->_debug;
@@ -286,7 +290,7 @@ class NoteController extends Controller
                         'user_id' => Auth::id(),
                         'name' => $tag->name,
                         'uuid' => $tag->uuid ? $tag->uuid : $this->generateUuid(),
-                        'is_system' => isset($tag->system) ? $tag->system : 0
+                        'system' => isset($tag->system) ? $tag->system : 0
                     ]
                 );
                 $this->debug('new tag inserted: '.$tagId);

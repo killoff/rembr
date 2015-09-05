@@ -1,5 +1,5 @@
 
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 (function () {
     'use strict';
@@ -9,7 +9,7 @@ var RembrServiceContainer = RembrServiceContainer || {};
 
     var LABEL_LENGTH = 200;
 
-    RembrServiceContainer.Note = React.createClass(
+    RembrContainer.Note = React.createClass(
     {
         handledChange: false,
 
@@ -19,6 +19,11 @@ var RembrServiceContainer = RembrServiceContainer || {};
             this.props.onEdit(function () {
 
             }, editField);
+        },
+
+        handleClick: function () {
+            var $label = $(React.findDOMNode(this)).find('label');
+            $label.html(this.props.note.text.replace(/\n/gm, "<br/>").replace(/\s/gm, "&nbsp;"))
         },
 
         handleBlur: function () {
@@ -49,7 +54,7 @@ var RembrServiceContainer = RembrServiceContainer || {};
         getEditText: function () {
             var text = this.props.note.text;
             for (var i = 0; i < this.props.note.tags.length; i++) {
-                text += (i == 0 ? "\n" : " ") + "!" + this.props.note.tags[i].name;
+                text += (i == 0 ? "" : " ") + "!" + this.props.note.tags[i].name;
             }
             return text;
         },
@@ -84,7 +89,18 @@ var RembrServiceContainer = RembrServiceContainer || {};
         decorateNote: function(domNode)
         {
             var $label = $(domNode).find('label');
-            var autolinker = new Autolinker( [] );
+            var autolinker = new Autolinker({
+                replaceFn : function(autolinker, match) {
+                    var firstDotIndex = match.getAnchorText().indexOf('.');
+                    var anchorText = match.getAnchorText();
+                    var anchorPrefix = '';
+                    if (firstDotIndex !== -1) {
+                        anchorPrefix = anchorText.substr(firstDotIndex);
+                        anchorText = anchorText.substr(0, firstDotIndex);
+                    }
+                    return '<a href="' + match.getAnchorHref() + '" target="_blank">' + anchorText + '</a>' + anchorPrefix;
+                }
+            });
             $label.html(autolinker.link( $label.html() ));
         },
 
@@ -119,7 +135,7 @@ var RembrServiceContainer = RembrServiceContainer || {};
                         <a onClick={this.delete} className="action action-delete">
                             <i className="tiny mdi-action-highlight-remove"></i>
                         </a>
-                        <label onDoubleClick={this.handleEdit} className="truncate">
+                            <label onDoubleClick={this.handleEdit} onClick={this.handleClick} className="truncate">
                             {this.getLabel()}
                         </label>
                         <div className="note-tags">

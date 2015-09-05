@@ -1,10 +1,10 @@
 
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 (function () {
     'use strict';
 
-    RembrServiceContainer.TagParser = {
+    RembrContainer.TagParser = {
         parse: function(text)
         {
             var tags = [],

@@ -45,6 +45,9 @@
 <script src="<?php echo asset('js/app/utils.js') ?>"></script>
 <script src="<?php echo asset('js/app/parser/tag.js') ?>"></script>
 <script src="<?php echo asset('js/app/parser/moment.js') ?>"></script>
+<script src="<?php echo asset('js/app/refiner/moment.js') ?>"></script>
+<script src="<?php echo asset('js/app/refiner/tag.js') ?>"></script>
+<script src="<?php echo asset('js/app/tool/moment.js') ?>"></script>
 <script src="<?php echo asset('js/app/storage.js') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app/component/note.jsx') ?>"></script>
 <script type="text/jsx" src="<?php echo asset('js/app/component/tag.jsx') ?>"></script>

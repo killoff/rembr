@@ -1,16 +1,16 @@
 
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 (function () {
     'use strict';
 
-    RembrServiceContainer.MomentParser = {
+    RembrContainer.MomentParser = {
         parse: function(text)
         {
-            var schedule = [];
+            var moments = [];
             var parsedResults = chrono.parse(text);
             if (parsedResults.length > 0) {
-                schedule = parsedResults.map(function(p) {
+                moments = parsedResults.map(function(p) {
                     return {
                         minute: p.start.knownValues.minute ? p.start.knownValues.minute : p.start.impliedValues.minute,
                         hour:   p.start.knownValues.hour   ? p.start.knownValues.hour   : p.start.impliedValues.hour,
@@ -21,7 +21,7 @@ var RembrServiceContainer = RembrServiceContainer || {};
                 });
             }
             return {
-                result: schedule,
+                result: moments,
                 new_text: text
             };
         }

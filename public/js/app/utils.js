@@ -1,9 +1,9 @@
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 (function () {
     'use strict';
 
-    RembrServiceContainer.Utils = {
+    RembrContainer.Utils = {
         uuid: function () {
             /*jshint bitwise:false */
             var i, random;

@@ -1,10 +1,10 @@
 
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 (function () {
     'use strict';
 
-    RembrServiceContainer.Tag = React.createClass({
+    RembrContainer.Tag = React.createClass({
         getInitialState: function() {
             return {pinned: this.props.tag.pinned ? true : false};
         },
@@ -27,6 +27,7 @@ var RembrServiceContainer = RembrServiceContainer || {};
                 <div href="#" className="collection-item white cursor-hand" onClick={this.props.onClick}>
                     <i className={className} onClick={this.togglePinned}>{iconName}</i>
                     {this.props.tag.name}
+                    {/*t:{this.props.tag.total},p:{this.props.tag.priority},o:{this.props.tag.order}*/}
                     {this.props.tag.selected ? <i className="tiny material-icons right">filter_list</i> : ''}
                     {this.props.tag.type=='period' ? <i className="tiny material-icons right">schedule</i> : ''}
                 </div>

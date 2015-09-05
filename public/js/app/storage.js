@@ -1,5 +1,5 @@
 
-var RembrServiceContainer = RembrServiceContainer || {};
+var RembrContainer = RembrContainer || {};
 
 function StorageEntityExistsException(message) {
     this.message = message;
@@ -30,7 +30,7 @@ function StorageGenericException(message) {
 (function () {
     'use strict';
 
-    var Utils = RembrServiceContainer.Utils;
+    var Utils = RembrContainer.Utils;
 
     var PUSH_URI    = '/note';
     var DELETE_URI  = '/delete';
@@ -38,6 +38,7 @@ function StorageGenericException(message) {
 
     var EVENT_ADD           = 'storage_add';
     var EVENT_UPDATE        = 'storage_update';
+    var EVENT_DELETE        = 'storage_delete';
     var EVENT_PULL          = 'storage_pull';
     var EVENT_TAGS_CHANGED  = 'tags_change';
 
@@ -98,7 +99,10 @@ function StorageGenericException(message) {
 
         var replacement = this.replaceNoteData(index, data);
         this.staging.updated.push(replacement.new_data);
-
+console.log('new data');
+console.log(replacement.new_data);
+console.log('this.staging.updated');
+console.log(this.staging.updated);
         this.inform(EVENT_UPDATE);
 
         return replacement.orig_data;
@@ -109,12 +113,6 @@ function StorageGenericException(message) {
         var origData = this.notes[index];
         this.notes[index] = data;
         this.notes[index].uuid = origData.uuid;
-
-        var c = data.tags.length;
-        for (var i = 0; i < c; i++) {
-            data.tags[i] = this.addTag(data.tags[i]);
-        }
-
         return {orig_data: origData, new_data: this.notes[index]};
     };
 
@@ -125,6 +123,7 @@ function StorageGenericException(message) {
             throw new StorageEntityNotFoundException('delete: note with uuid ' + uuid + ' not found in storage');
         }
         this.notes.splice(index, 1);
+        this.inform(EVENT_DELETE);
         this.staging.deleted.push(uuid);
     };
 
@@ -148,15 +147,18 @@ function StorageGenericException(message) {
 
     Storage.prototype.addTagAsObject = function (tag)
     {
+        //console.log('addTagAsObject:');
+        //console.log(tag);
         if (!tag.uuid || !tag.name) {
             throw new StorageInvalidObjectException('tag object must have uuid and name to be added');
         }
-        var tagIndex = this.indexOfTag(tag.uuid);
+        tag = this.accomplishTagData(tag);
 
+        var tagIndex = this.indexOfTag(tag.uuid);
         if (tagIndex === -1) {
-            this.pushTagAsObject(tag);
+            tag.total = 1;
+            this.tags.push(tag);
         } else {
-            tag = this.accomplishTagData(tag);
             tag.total++;
             this.tags[tagIndex] = tag;
         }
@@ -164,39 +166,27 @@ function StorageGenericException(message) {
         return tag;
     };
 
-    Storage.prototype.pushTagAsObject = function (tag)
-    {
-        if (!tag.uuid || !tag.name) {
-            throw new StorageInvalidObjectException('tag object must have uuid and name to be added');
-        }
-
-        tag = this.accomplishTagData(tag);
-        this.tags.push(tag);
-
-        return tag;
-    };
-
     Storage.prototype.accomplishTagData = function(data)
     {
-        var result = RembrServiceContainer.Utils.clone(data);
+        var result = RembrContainer.Utils.clone(data);
 
         if (!result.hasOwnProperty('type')) {
             result.type = TAG_TYPE_WORD;
         }
+        if (!result.hasOwnProperty('system')) {
+            result.system = false;
+        }
+        if (!result.hasOwnProperty('pinned')) {
+            result.pinned = false;
+        }
         if (!result.hasOwnProperty('total')) {
             result.total = 0;
-        }
-        if (!result.hasOwnProperty('available')) {
-            result.available = result.total > 0;
         }
         if (!result.hasOwnProperty('priority')) {
             result.priority = 0;
         }
         if (!result.hasOwnProperty('order')) {
             result.order = 0;
-        }
-        if (!result.hasOwnProperty('pinned')) {
-            result.pinned = false;
         }
 
         result.selected = this.filters.tags.indexOf(data.uuid) !== -1;
@@ -224,6 +214,7 @@ function StorageGenericException(message) {
             });
         }
 
+/*
         if (this.staging.deleted.length > 0) {
             $.ajax({
                 method: 'POST',
@@ -238,6 +229,7 @@ function StorageGenericException(message) {
                 }
             });
         }
+*/
     };
 
     Storage.prototype.pull = function (callback)
@@ -251,29 +243,29 @@ function StorageGenericException(message) {
 
                 var responseJson = $.parseJSON(data)
 
-                var i, c;
+                var i, c, tag;
 
                 c = responseJson.tags.length;
                 for (i = 0; i < c; i++) {
-                    this.pushTagAsObject(responseJson.tags[i]);
+                    tag = this.accomplishTagData(responseJson.tags[i]);
+                    this.tags.push(tag);
                 }
 
                 c = responseJson.notes.length;
                 for (i = 0; i < c; i++) {
-                    // put note directly when pulling
                     this.notes.push(responseJson.notes[i]);
                 }
                 //c = responseJson.periods.length;
-                //var currentDatePeriods = this.getCurrentDatePeriods();
+                //var currentPeriods = this.getCurrentDatePeriods();
                 //for (i = 0; i < c; i++) {
-                //    for (var j = 0; j < currentDatePeriods.length; j++) {
-                //        if (responseJson.periods[i] === currentDatePeriods[j].uuid) {
+                //    for (var j = 0; j < currentPeriods.length; j++) {
+                //        if (responseJson.periods[i] === currentPeriods[j].uuid) {
                 //            this.addTag({
-                //                name: currentDatePeriods[j].name,
-                //                uuid: currentDatePeriods[j].uuid,
+                //                name: currentPeriods[j].name,
+                //                uuid: currentPeriods[j].uuid,
                 //                priority: 1,
                 //                available: true,
-                //                order: currentDatePeriods[j].order,
+                //                order: currentPeriods[j].order,
                 //                type: 'period'
                 //            });
                 //        }
@@ -383,6 +375,11 @@ function StorageGenericException(message) {
         return this.subscribe(EVENT_UPDATE, handler);
     };
 
+    Storage.prototype.onDelete = function (handler)
+    {
+        return this.subscribe(EVENT_DELETE, handler);
+    };
+
     Storage.prototype.onPull = function (handler)
     {
         return this.subscribe(EVENT_PULL, handler);
@@ -393,6 +390,6 @@ function StorageGenericException(message) {
         return this.subscribe(EVENT_TAGS_CHANGED, handler);
     };
 
-    RembrServiceContainer.Storage = Storage;
+    RembrContainer.Storage = Storage;
 
 })();
