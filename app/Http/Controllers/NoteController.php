@@ -1,4 +1,9 @@
 <?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+
 class NoteController extends Controller
 {
     const TAG_ENCLOSURE = ':';

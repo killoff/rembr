@@ -1,4 +1,9 @@
 <?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+
 class OauthController extends Controller
 {
     public function google()
