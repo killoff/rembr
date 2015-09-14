@@ -15,7 +15,6 @@ class UserRepository
                 'username' => $userData->nickname,
                 'email' => $userData->email,
                 'avatar' => $userData->avatar,
-                'active' => 1,
             ]);
         }
 
