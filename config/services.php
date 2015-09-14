@@ -35,4 +35,23 @@ return [
         'secret' => env('STRIPE_SECRET'),
     ],
 
+    'google' => array(
+        'client_id'     => getenv('GOOGLE_CLIENT_ID'),
+        'client_secret' => getenv('GOOGLE_CLIENT_SECRET'),
+        'redirect'      => 'http://rembr.us/oauth/google',
+        'scope'         => ['profile', 'email'],
+    ),
+
+    'twitter' => [
+        'client_id'     => getenv('TWITTER_CLIENT_ID'),
+        'client_secret' => getenv('TWITTER_CLIENT_SECRET'),
+        'redirect'      => 'http://rembr.us/oauth/twitter',
+    ],
+
+    'facebook' => [
+        'client_id'     => '1521924611416223',
+        'client_secret' => 'c5299a1ec736b17782ab1a5b11c45f10',
+        'scope'         => ['email', 'user_online_presence'],
+    ],
+
 ];

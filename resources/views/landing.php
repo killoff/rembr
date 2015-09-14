@@ -28,7 +28,11 @@
 
 <div id="header">
     <div class="insider">
-        <div style="float:right;margin:0px 0 0;padding:15px 8px;font-size:85%;">Sign in with <a href="<?php echo route('googleLogin') ?>">Google</a> or <a href="<?php echo route('facebookLogin') ?>">Facebook</a></div>
+        <div style="float:right;margin:0px 0 0;padding:15px 8px;font-size:85%;">Sign in with
+            <a href="<?php echo route('socialite.auth', ['provider' => 'google']) ?>">Google</a>
+         or <a href="<?php echo route('socialite.auth', ['provider' => 'twitter']) ?>">Twitter</a>
+         or <a href="<?php echo route('socialite.auth', ['provider' => 'facebook']) ?>">Facebook</a>
+        </div>
         <img src="/i/logo.gif" alt="" style="margin:2px 0 0;">
     </div>
 </div>

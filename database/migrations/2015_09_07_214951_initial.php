@@ -59,9 +59,9 @@ class Initial extends Migration
         Schema::create('note_tag', function (Blueprint $table) {
             $table->engine = 'InnoDB';
             $table->integer('note_id')->unsigned();
+            $table->integer('tag_id')->unsigned();
             $table->foreign('note_id')->references('note_id')->on('note')->onDelete('cascade');
-            $table->integer('user_id')->unsigned();
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('tag_id')->references('tag_id')->on('tag')->onDelete('cascade');
         });
 
         Schema::create('search_index', function (Blueprint $table) {
