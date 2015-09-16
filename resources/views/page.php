@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="csrf-token" content="<?php echo csrf_token(); ?>">
     <link type="text/css" rel="stylesheet" href="/css/local.css" media="screen,projection"/>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
@@ -62,4 +63,11 @@
 <script src="<?php echo asset('js/moment.min.js') ?>"></script>
 <script src="<?php echo asset('js/local.js') ?>"></script>
 </body>
+<script>
+    $.ajaxSetup({
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        }
+    });
+</script>
 </html>

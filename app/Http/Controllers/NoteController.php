@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Auth;
+use Request;
+use Input;
+use DB;
 
 class NoteController extends Controller
 {
