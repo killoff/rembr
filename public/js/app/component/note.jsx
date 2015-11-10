@@ -13,6 +13,10 @@ var RembrContainer = RembrContainer || {};
     {
         handledChange: false,
 
+        getInitialState: function() {
+            return {pinned: this.props.note.pinned ? true : false};
+        },
+
         handleEdit: function () {
             this.handledChange = false;
             var editField = this.refs.editField.getDOMNode();
@@ -22,6 +26,7 @@ var RembrContainer = RembrContainer || {};
         },
 
         handleClick: function () {
+            console.log('clicked');
             var $label = $(React.findDOMNode(this)).find('label');
             $label.html(this.props.note.text.replace(/\n/gm, "<br/>").replace(/\s/gm, "&nbsp;"))
         },
@@ -129,13 +134,22 @@ var RembrContainer = RembrContainer || {};
                 'editing': this.props.editing,
                 'pinned-note': this.props.note.pinned
             });
+            var starClassName = React.addons.classSet({
+                'material-icons': true,
+                'action-pin': true,
+                //'invisible': !this.state.pinned,
+                //'visible': this.state.pinned
+            });
+            var starIconName = this.state.pinned ? 'star' : 'star_border';
             return (
                 <div className={className}>
                     <div className="view">
                         <a onClick={this.delete} className="action action-delete">
                             <i className="tiny mdi-action-highlight-remove"></i>
                         </a>
-                            <label onDoubleClick={this.handleEdit} onClick={this.handleClick} className="truncate">
+                        {/* <input type="checkbox" id={'s'+this.props.note.uuid} className="checkbox" /><label htmlFor={'s'+this.props.note.uuid} /> */}
+                        {/* <i className={starClassName} onClick={this.togglePinned}>{starIconName}</i> */}
+                        <label onDoubleClick={this.handleEdit} onClick={this.handleClick} className="truncate">
                             {this.getLabel()}
                         </label>
                         <div className="note-tags">

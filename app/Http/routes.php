@@ -1,20 +1,19 @@
 <?php
-Route::get('/oauth/{provider}', ['as' => 'socialite.auth', 'uses' => 'SocialiteController@auth']);
+Route::get('/oauth/{provider}', ['as' => 'socialite.auth',  'uses' => 'SocialiteController@auth']);
+Route::get('/logout',           ['as' => 'logout',          'uses' => 'SocialiteController@logout']);
 
-Route::get('/', array('as' => 'splash', 'uses' => 'HomeController@splash'));
-Route::get('/google-oauth', array('as' => 'googleLogin', 'uses' => 'OauthController@google'));
-Route::get('/facebook-oauth', array('as' => 'facebookLogin', 'uses' => 'OauthController@facebook'));
-Route::get('/notes', array('as' => 'noteList', 'uses' => 'NoteController@listing'));
-Route::get('/all', array('as' => 'all', 'uses' => 'NoteController@all'));
+Route::get('/',             ['as' => 'splash',                              'uses' => 'HomeController@splash']);
+Route::get('/notes',        ['as' => 'noteList',    'middleware' => 'auth', 'uses' => 'NoteController@listing']);
+Route::get('/all',          ['as' => 'all',         'middleware' => 'auth', 'uses' => 'NoteController@all']);
 
-Route::post('/note', array('as' => 'notePost', 'uses' => 'NoteController@save'));
-Route::post('/delete', array('as' => 'delete_note', 'uses' => 'NoteController@delete'));
-Route::post('/pin_tag', array('as' => 'pinTag', 'uses' => 'NoteController@pinTag'));
+Route::post('/note',        ['as' => 'notePost',     'middleware' => 'auth', 'uses' => 'NoteController@save']);
+Route::post('/delete',      ['as' => 'delete_note',  'middleware' => 'auth', 'uses' => 'NoteController@delete']);
+Route::post('/pin_tag',     ['as' => 'pinTag',       'middleware' => 'auth', 'uses' => 'NoteController@pinTag']);
 
-Route::get('/test', array('as' => 'test', 'uses' => 'NoteController@test'));
-Route::get('/update_uuids', array('as' => 'update_uuids', 'uses' => 'NoteController@updateUuids'));
-
+Route::get('/test',         ['as' => 'test',         'middleware' => 'auth', 'uses' => 'NoteController@test']);
+Route::get('/update_uuids', ['as' => 'update_uuids', 'middleware' => 'auth', 'uses' => 'NoteController@updateUuids']);
 
 
-//Route::get('/refresh_index', array('as' => 'refresh_index', 'uses' => 'NoteController@refreshIndex'));
+
+//Route::get('/refresh_index', ['as' => 'refresh_index', 'uses' => 'NoteController@refreshIndex'));
 

@@ -16,16 +16,11 @@ class NoteController extends Controller
     public function all()
     {
         try {
-//    Auth::loginUsingId(5);
             $userId = Auth::id();
             $response = [
                 'notes' => [],
                 'tags' => []
             ];
-
-            if (!Auth::check()) {
-                return json_encode($response);
-            }
 
             $filters = json_decode(Input::get('filter'), true);
             $periods = Input::get('periods', []);
@@ -194,9 +189,9 @@ class NoteController extends Controller
     {
         try {
 
-            if (!Auth::check()) {
-                throw new \LogicException('Authorization failed.');
-            }
+//            if (!Auth::check()) {
+//                throw new \LogicException('Authorization failed.');
+//            }
 
             $notes = json_decode(Request::instance()->getContent());
 
@@ -259,9 +254,6 @@ class NoteController extends Controller
     public function delete()
     {
         $uuid = Input::get('uuid');
-        if (!Auth::check()) {
-            return;
-        }
         $note = DB::table('note')->whereUserId(Auth::id())->whereUuid($uuid)->first();
         if ($note !== null) {
             DB::table('note')->whereNoteId($note->note_id)->delete();
@@ -371,11 +363,6 @@ class NoteController extends Controller
 
     public function pinTag()
     {
-        // todo: validation code is duplicated
-        if (!Auth::check()) {
-            throw new \LogicException('Authorization failed.');
-        }
-
         $tag = json_decode(Request::instance()->getContent());
 
         if (! $tag instanceof \stdClass) {

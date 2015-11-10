@@ -35,7 +35,7 @@
 </footer>
 <ul id="user-menu" class="dropdown-content">
     <li><a href="#!">Settings<!--i class="fa fa-cog right"></i--></a></li>
-    <li><a href="#!">Log out<!--i class="fa fa-sign-out right"></i></a></li>
+    <li><a href="<?php echo route('logout') ?>">Log out<!--i class="fa fa-sign-out right"></i></a></li>
 </ul>
 <!--Import jQuery before materialize.js-->
 <!--<script src="<?php echo asset('js/require.js') ?>"></script>-->

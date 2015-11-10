@@ -176,9 +176,13 @@ console.log(this.staging.updated);
         if (!result.hasOwnProperty('system')) {
             result.system = false;
         }
+        result.system = Utils.toBoolean(result.system);
+
         if (!result.hasOwnProperty('pinned')) {
             result.pinned = false;
         }
+        result.pinned = Utils.toBoolean(result.pinned);
+
         if (!result.hasOwnProperty('total')) {
             result.total = 0;
         }

@@ -49,9 +49,10 @@ return [
     ],
 
     'facebook' => [
-        'client_id'     => '1521924611416223',
-        'client_secret' => 'c5299a1ec736b17782ab1a5b11c45f10',
-        'scope'         => ['email', 'user_online_presence'],
+        'client_id'     => getenv('FB_CLIENT_ID'),
+        'client_secret' => getenv('FB_CLIENT_SECRET'),
+        'redirect'      => 'http://rembr.us/oauth/facebook',
+        'scope'         => ['email'],
     ],
 
 ];

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\AuthenticateUser;
 use Socialite;
+use Auth;
 
 class SocialiteController extends Controller
 {
@@ -16,6 +17,12 @@ class SocialiteController extends Controller
 
     public function userHasLoggedIn($user)
     {
+        return redirect('/');
+    }
+
+    public function logout()
+    {
+        Auth::logout();
         return redirect('/');
     }
 }

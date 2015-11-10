@@ -6,7 +6,7 @@ var RembrContainer = RembrContainer || {};
 
     RembrContainer.Tag = React.createClass({
         getInitialState: function() {
-            return {pinned: this.props.tag.pinned ? true : false};
+            return {pinned: this.props.tag.pinned};
         },
 
         togglePinned: function (event) {
