@@ -32,6 +32,8 @@ function StorageGenericException(message) {
 
     var Utils = RembrContainer.Utils;
 
+    var PIN_TAGS_URI    = '/pintags';
+    var UNPIN_TAGS_URI    = '/unpintags';
     var PUSH_URI    = '/note';
     var DELETE_URI  = '/delete';
     var PULL_URI    = '/all';
@@ -56,7 +58,7 @@ function StorageGenericException(message) {
         this.subscribers = {};
         this.flags = {};
         this.currentDatePeriods = {};
-        this.staging = {updated: [], deleted: []};
+        this.staging = {updated: [], deleted: [], pinned_tag_uuids: [], unpinned_tag_uuids: []};
     };
 
     Storage.prototype.getNotes = function()
@@ -194,7 +196,7 @@ console.log(this.staging.updated);
         }
 
         result.selected = this.filters.tags.indexOf(data.uuid) !== -1;
-
+console.log(result);
         return result;
     };
 
@@ -211,6 +213,38 @@ console.log(this.staging.updated);
                 success: function (data) {
                     // todo: unset only uuids returned from server
                     this.staging.updated = [];
+                }.bind(this),
+                error: function(xhr, status, err) {
+                    throw new StorageServerException('error occurred while pushing updates to server');
+                }.bind(this)
+            });
+        }
+
+        if (this.staging.pinned_tag_uuids.length > 0) {
+
+            $.ajax({
+                method: 'POST',
+                url: PIN_TAGS_URI,
+                data: JSON.stringify(this.staging.pinned_tag_uuids),
+                success: function (data) {
+                    // todo: unset only uuids returned from server
+                    this.staging.pinned_tag_uuids = [];
+                }.bind(this),
+                error: function(xhr, status, err) {
+                    throw new StorageServerException('error occurred while pushing updates to server');
+                }.bind(this)
+            });
+        }
+
+        if (this.staging.unpinned_tag_uuids.length > 0) {
+
+            $.ajax({
+                method: 'POST',
+                url: UNPIN_TAGS_URI,
+                data: JSON.stringify(this.staging.unpinned_tag_uuids),
+                success: function (data) {
+                    // todo: unset only uuids returned from server
+                    this.staging.unpinned_tag_uuids = [];
                 }.bind(this),
                 error: function(xhr, status, err) {
                     throw new StorageServerException('error occurred while pushing updates to server');
@@ -298,6 +332,16 @@ console.log(this.staging.updated);
         } else {
             this.filters.tags.splice(index, 1);
         }
+    };
+
+    Storage.prototype.pinTag = function(tag)
+    {
+        this.staging.pinned_tag_uuids.push(tag.uuid);
+    };
+
+    Storage.prototype.unpinTag = function(tag)
+    {
+        this.staging.unpinned_tag_uuids.push(tag.uuid);
     };
 
     Storage.prototype.setSearchQuery = function(query)

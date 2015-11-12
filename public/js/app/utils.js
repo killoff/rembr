@@ -33,10 +33,10 @@ var RembrContainer = RembrContainer || {};
 
         // aka php boolean
         toBoolean: function(value) {
-            if (value === false || typeof value === 'undefined') {
+            if (value === false || value === 0 || value === '0' || typeof value === 'undefined') {
                 return false;
             }
-            if (value === 0 || value === '0' || value === '' || value === null || value === [] || value === {}) {
+            if (value === '' || value === null || value === [] || value === {}) {
                 return false;
             }
             return true;

@@ -11,7 +11,16 @@ var RembrContainer = RembrContainer || {};
 
         togglePinned: function (event) {
             event.stopPropagation();
-            this.setState({pinned: !this.state.pinned}/*, this.pinCallback*/);
+            //this.props.tag.email = this.state.pinned;
+            this.setState({pinned: !this.state.pinned}, function () {
+                this.props.onPin(this.state.pinned);
+            });
+        },
+
+        componentWillReceiveProps: function(nextProps) {
+            this.setState({
+                pinned: nextProps.tag.pinned
+            });
         },
 
         render: function () {

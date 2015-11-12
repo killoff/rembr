@@ -361,20 +361,25 @@ class NoteController extends Controller
         });
     }
 
-    public function pinTag()
+    public function pinTags()
     {
-        $tag = json_decode(Request::instance()->getContent());
+        $tagUuids = json_decode(Request::instance()->getContent());
+        foreach ($tagUuids as $uuid) {
+            DB::table('tag')->whereUuid($uuid)
+                ->whereUserId(Auth::id())
+                ->update(['pinned' => 1]);
+        }
+    }
 
-        if (! $tag instanceof \stdClass) {
-            throw new \DomainException('tag must be an object.');
+
+    public function unpinTags()
+    {
+        $tagUuids = json_decode(Request::instance()->getContent());
+        foreach ($tagUuids as $uuid) {
+            DB::table('tag')->whereUuid($uuid)
+                ->whereUserId(Auth::id())
+                ->update(['pinned' => 0]);
         }
-        if (empty($tag->uuid)) {
-            throw new \DomainException('tag.uuid not found, unable to pin.');
-        }
-        $pinned = $tag->pinned ? 1 : 0;
-        DB::table('tag')->whereUuid($tag->uuid)
-            ->whereUserId(Auth::id())
-            ->update(['pinned' => $pinned]);
     }
 
     private function generateUuid()

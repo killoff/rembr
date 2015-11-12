@@ -6,6 +6,8 @@ var RembrContainer = RembrContainer || {};
     var ENTER_KEY = 13;
     var TAGS_EXPAND_STEP = 5;
 
+    var Utils = RembrContainer.Utils;
+
     var Main = React.createClass({
         getInitialState: function ()
         {
@@ -108,6 +110,12 @@ var RembrContainer = RembrContainer || {};
         // todo: sort only if tags list changed
         sortTags: function (one, two)
         {
+            if (one.pinned && !two.pinned) {
+                return -1;
+            }
+            if (!one.pinned && two.pinned) {
+                return 1;
+            }
             if (one.priority > two.priority) {
                 return -1;
             }
@@ -141,12 +149,10 @@ var RembrContainer = RembrContainer || {};
             this.props.storage.pull();
         },
 
-        pinTag: function(tag)
+        pinTag: function(tag, pinned)
         {
-            if (tag.available) {
-                this.props.storage.toggleTagPinned(tag);
-                this.props.storage.serverPull();
-            }
+            Utils.toBoolean(pinned) ? this.props.storage.pinTag(tag) : this.props.storage.unpinTag(tag);
+            this.props.storage.push();
         },
 
         expandTags: function()
@@ -263,7 +269,7 @@ var RembrContainer = RembrContainer || {};
                     <TagComponent
                         tag={tag}
                         onClick={this.clickTag.bind(this, tag)}
-                        onPinTag={this.pinTag.bind(this, tag)}
+                        onPin={this.pinTag.bind(this, tag)}
                     />
                 );
             }, this);
